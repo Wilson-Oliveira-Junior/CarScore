@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: carscore-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: carscore
+      POSTGRES_PASSWORD: carscore
+      POSTGRES_DB: carscore
+    ports:
+      - "5432:5432"
+    volumes:
+      - carscore_pgdata:/var/lib/postgresql/data
+
+volumes:
+  carscore_pgdata:
