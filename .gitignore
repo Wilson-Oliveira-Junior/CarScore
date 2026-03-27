@@ -1,46 +1,5 @@
 # Node
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# TypeScript
-dist/
-build/
-
-# Flutter
-.dart_tool/
-/.packages
-/.flutter-plugins
-/.flutter-plugins-dependencies
-build/
-**/pubspec.lock
-
-# Android
-/android/.gradle/
-/android/.idea/
-/android/.gradle/
-/android/app/**/gradle-wrapper.jar
-
-# iOS
-ios/Pods/
-ios/Flutter/Flutter.framework
-ios/Flutter/Flutter.podspec
-
-# VSCode
-.vscode/
-
-# JetBrains
-.idea/
-*.iml
-
-# Logs
-*.log
-
-# Misc
-.DS_Store
-*.swp# Node
-node_modules/
 dist/
 
 # Flutter

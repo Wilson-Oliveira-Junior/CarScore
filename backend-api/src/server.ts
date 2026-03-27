@@ -2,10 +2,13 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
 import { analyze } from './score';
+import { getAnalysisHistory, getWeights, initDb, insertAnalysis, updateWeights } from './db';
 
 const app = Fastify({ logger: true });
 
 async function buildServer() {
+  await initDb();
+
   await app.register(cors, {
     origin: true,
   });
@@ -34,11 +37,70 @@ async function buildServer() {
     }
 
     const data = parsed.data;
-    const analysis = analyze(data);
+    const weights = await getWeights();
+    const result = analyze(data, weights);
+    const analysisId = await insertAnalysis({ input: data, result });
+
     return {
       input: data,
-      result: analysis,
+      result,
+      meta: {
+        analysisId,
+      },
     };
+  });
+
+  app.get('/v1/analysis/history', async (request) => {
+    const querySchema = z.object({
+      limit: z.coerce.number().int().min(1).max(100).optional(),
+    });
+
+    const parsed = querySchema.safeParse(request.query);
+    const limit = parsed.success ? parsed.data.limit ?? 20 : 20;
+    const history = await getAnalysisHistory(limit);
+
+    return {
+      items: history,
+      count: history.length,
+    };
+  });
+
+  app.get('/v1/config/weights', async () => {
+    const weights = await getWeights();
+    return { weights };
+  });
+
+  app.put('/v1/config/weights', async (request, reply) => {
+    const bodySchema = z.object({
+      price: z.number().nonnegative(),
+      fuel: z.number().nonnegative(),
+      maintenance: z.number().nonnegative(),
+      adequacy: z.number().nonnegative(),
+    });
+
+    const parsed = bodySchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: 'invalid_payload',
+        details: parsed.error.flatten(),
+      });
+    }
+
+    const sum =
+      parsed.data.price +
+      parsed.data.fuel +
+      parsed.data.maintenance +
+      parsed.data.adequacy;
+
+    if (sum <= 0) {
+      return reply.status(400).send({
+        error: 'invalid_weights',
+        message: 'The sum of all weights must be greater than zero.',
+      });
+    }
+
+    const weights = await updateWeights(parsed.data);
+    return { weights };
   });
 }
 

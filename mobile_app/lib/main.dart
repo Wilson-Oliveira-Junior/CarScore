@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'features/home/home_page.dart';
+import 'core/app_theme.dart';
+import 'features/shell/app_shell.dart';
 
 void main() {
   runApp(const MyApp());
@@ -12,11 +13,8 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'CarScore Mobile',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const HomePage(),
+      theme: AppTheme.light(),
+      home: const AppShell(),
     );
   }
 }

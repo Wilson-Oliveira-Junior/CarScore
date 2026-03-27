@@ -8,8 +8,36 @@ export type AnalysisInput = {
   maintenanceMonthly: number;
 };
 
-export function analyze(input: AnalysisInput) {
+export type ScoreWeights = {
+  price: number;
+  fuel: number;
+  maintenance: number;
+  adequacy: number;
+};
+
+export const defaultWeights: ScoreWeights = {
+  price: 0.4,
+  fuel: 0.25,
+  maintenance: 0.2,
+  adequacy: 0.15,
+};
+
+export function normalizeWeights(input: ScoreWeights): ScoreWeights {
+  const sum = input.price + input.fuel + input.maintenance + input.adequacy;
+  if (sum <= 0) {
+    return defaultWeights;
+  }
+  return {
+    price: input.price / sum,
+    fuel: input.fuel / sum,
+    maintenance: input.maintenance / sum,
+    adequacy: input.adequacy / sum,
+  };
+}
+
+export function analyze(input: AnalysisInput, customWeights: ScoreWeights = defaultWeights) {
   const data = input;
+  const weights = normalizeWeights(customWeights);
 
   const fuelMonthly = (data.kmPerMonth / data.kmPerLiter) * data.fuelPricePerLiter;
   const monthlyTotal = fuelMonthly + data.maintenanceMonthly;
@@ -42,14 +70,6 @@ export function analyze(input: AnalysisInput) {
   adequacyScore -= Math.max(0, Math.min(40, (data.kmPerMonth - 800) / 20));
   adequacyScore -= Math.max(0, Math.min(40, (8 - data.kmPerLiter) * 5));
   adequacyScore = Math.round(Math.max(0, Math.min(100, adequacyScore)));
-
-  // New weights: price more important
-  const weights = {
-    price: 0.4,
-    fuel: 0.25,
-    maintenance: 0.2,
-    adequacy: 0.15,
-  };
 
   const finalScore = Math.round(
     priceScore * weights.price +

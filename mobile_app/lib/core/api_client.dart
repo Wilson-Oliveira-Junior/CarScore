@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+typedef ScoreWeights = Map<String, double>;
+
 class ApiClient {
   ApiClient({this.baseUrl = 'http://localhost:3333'});
 
@@ -17,6 +19,46 @@ class ApiClient {
     final resp = await http.post(uri,
         headers: {'Content-Type': 'application/json'}, body: jsonEncode(body));
     return _parse(resp);
+  }
+
+  Future<List<Map<String, dynamic>>> history({int limit = 20}) async {
+    final uri = Uri.parse('$baseUrl/v1/analysis/history?limit=$limit');
+    final resp = await http.get(uri);
+    final parsed = _parse(resp);
+    final rawItems = (parsed['items'] as List<dynamic>? ?? []);
+    return rawItems
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList();
+  }
+
+  Future<ScoreWeights> getWeights() async {
+    final uri = Uri.parse('$baseUrl/v1/config/weights');
+    final resp = await http.get(uri);
+    final parsed = _parse(resp);
+    final raw = Map<String, dynamic>.from(parsed['weights'] as Map);
+    return {
+      'price': (raw['price'] as num).toDouble(),
+      'fuel': (raw['fuel'] as num).toDouble(),
+      'maintenance': (raw['maintenance'] as num).toDouble(),
+      'adequacy': (raw['adequacy'] as num).toDouble(),
+    };
+  }
+
+  Future<ScoreWeights> updateWeights(ScoreWeights weights) async {
+    final uri = Uri.parse('$baseUrl/v1/config/weights');
+    final resp = await http.put(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(weights),
+    );
+    final parsed = _parse(resp);
+    final raw = Map<String, dynamic>.from(parsed['weights'] as Map);
+    return {
+      'price': (raw['price'] as num).toDouble(),
+      'fuel': (raw['fuel'] as num).toDouble(),
+      'maintenance': (raw['maintenance'] as num).toDouble(),
+      'adequacy': (raw['adequacy'] as num).toDouble(),
+    };
   }
 
   Map<String, dynamic> _parse(http.Response resp) {
