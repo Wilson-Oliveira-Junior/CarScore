@@ -6,6 +6,8 @@ export type AnalysisInput = {
   kmPerLiter: number;
   fuelPricePerLiter: number;
   maintenanceMonthly: number;
+  /** Preço de referência FIPE real (quando disponível). Substitui a heurística interna. */
+  fipeReferencePrice?: number;
 };
 
 export type ScoreWeights = {
@@ -43,10 +45,11 @@ export function analyze(input: AnalysisInput, customWeights: ScoreWeights = defa
   const monthlyTotal = fuelMonthly + data.maintenanceMonthly;
 
   // Pillar 1: priceScore
-  // Heuristic reference price: baseline 60k depreciating 4% per year
+  // Usa preço FIPE real quando disponível; caso contrário, heurística de depreciação.
   const currentYear = new Date().getFullYear();
   const age = Math.max(0, currentYear - data.year);
-  const referencePrice = Math.max(3000, 60000 * Math.pow(0.96, age));
+  const referencePrice = data.fipeReferencePrice ?? Math.max(3000, 60000 * Math.pow(0.96, age));
+  const priceSource = data.fipeReferencePrice ? 'fipe' : 'heuristic';
   const priceRatio = data.askingPrice / referencePrice;
   let priceScore = 0;
   if (priceRatio <= 0.8) priceScore = 100;
@@ -95,5 +98,9 @@ export function analyze(input: AnalysisInput, customWeights: ScoreWeights = defa
     weights,
     finalScore,
     label,
+    meta: {
+      referencePrice,
+      priceSource,
+    },
   };
 }

@@ -20,10 +20,32 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _saving = false;
   String? _message;
 
+  final _cityCtrl = TextEditingController(text: 'Sao Paulo - SP');
+  final _budgetCtrl = TextEditingController(text: '1200');
+  final _fuelCtrl = TextEditingController(text: '5.89');
+
+  bool _notifyDrops = true;
+  bool _preferEconomy = true;
+  bool _includePartsInHistory = true;
+
+  @override
+  void dispose() {
+    _cityCtrl.dispose();
+    _budgetCtrl.dispose();
+    _fuelCtrl.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  void _saveProfilePrefs() {
+    setState(() {
+      _message = 'Preferencias salvas localmente para esta sessao.';
+    });
   }
 
   Future<void> _load() async {
@@ -115,9 +137,11 @@ class _SettingsPageState extends State<SettingsPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Pesos do score', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                        const Text('Como o score funciona', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                         const SizedBox(height: 8),
-                        const Text('A API normaliza os pesos para somar 1.0.'),
+                        const Text(
+                          'Cada slider aumenta ou reduz o impacto de um pilar na nota final. O backend normaliza automaticamente para somar 1.0.',
+                        ),
                         const SizedBox(height: 16),
                         _weightSlider(
                           label: 'Preço',
@@ -141,6 +165,10 @@ class _SettingsPageState extends State<SettingsPage> {
                         ),
                         const SizedBox(height: 8),
                         Text('Soma atual: ${sum.toStringAsFixed(2)}'),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Dica: mantenha Preco alto se a negociacao for prioridade. Aumente Combustivel e Manutencao se foco for custo mensal.',
+                        ),
                         const SizedBox(height: 8),
                         SizedBox(
                           width: double.infinity,
@@ -165,11 +193,86 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ),
                 const SizedBox(height: 10),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Perfil e personalizacao',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Essas preferencias ajudam voce a analisar com contexto pessoal de regiao, combustivel e meta de gasto mensal.',
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _cityCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Cidade/regiao padrao',
+                            prefixIcon: Icon(Icons.location_on_outlined),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _budgetCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: const InputDecoration(
+                            labelText: 'Meta de gasto mensal (R\$)',
+                            prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _fuelCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: const InputDecoration(
+                            labelText: 'Preco padrao do combustivel (R\$/L)',
+                            prefixIcon: Icon(Icons.local_gas_station_outlined),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: _notifyDrops,
+                          onChanged: (v) => setState(() => _notifyDrops = v),
+                          title: const Text('Alertar quando houver queda de preco'),
+                        ),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: _preferEconomy,
+                          onChanged: (v) => setState(() => _preferEconomy = v),
+                          title: const Text('Priorizar economia no score sugerido'),
+                        ),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: _includePartsInHistory,
+                          onChanged: (v) => setState(() => _includePartsInHistory = v),
+                          title: const Text('Mostrar historico de pecas junto com carros'),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _saveProfilePrefs,
+                            icon: const Icon(Icons.tune),
+                            label: const Text('Salvar preferencias'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
                 const Card(
                   child: ListTile(
                     leading: Icon(Icons.info_outline),
-                    title: Text('Impacto'),
-                    subtitle: Text('As novas análises usarão os pesos atualizados imediatamente no backend.'),
+                    title: Text('Impacto no app'),
+                    subtitle: Text(
+                      'Pesos sao aplicados no backend imediatamente. Preferencias pessoais sao usadas para orientar sua experiencia e comparacoes.',
+                    ),
                   ),
                 ),
               ],

@@ -1,54 +1,64 @@
-# CarScore API
+﻿# CarScore API v1
 
-Base URL (local): `http://localhost:3333`
+Base URL local: `http://localhost:3333`
 
-This document describes the endpoints used by the mobile app.
+A API retorna sempre `Content-Type: application/json`.
+Todos os valores monetários estão em **Reais (R$)**.
+
+---
 
 ## GET /health
 
-Response:
+Verifica se o servidor está no ar.
 
+**Response 200**
 ```json
-{
-  "status": "ok",
-  "service": "carscore-api"
-}
+{ "status": "ok", "service": "carscore-api" }
 ```
+
+---
 
 ## POST /v1/analysis/estimate
 
-Request body (application/json):
+Calcula a viabilidade de compra de um veículo com base no perfil do usuário.
 
+**Request body**
+
+| Campo               | Tipo   | Obrig. | Descrição                                     |
+|---------------------|--------|--------|-----------------------------------------------|
+| vehicleLabel        | string | sim    | Ex.: "Honda Civic". Mínimo 3 caracteres.      |
+| year                | number | sim    | Ano de fabricação (1950 – ano atual + 1).      |
+| askingPrice         | number | sim    | Preço pedido pelo vendedor (R$).               |
+| kmPerMonth          | number | sim    | Quilometragem mensal estimada.                 |
+| kmPerLiter          | number | sim    | Consumo médio do veículo (km/l).               |
+| fuelPricePerLiter   | number | sim    | Preço atual do combustível (R$/l).             |
+| maintenanceMonthly  | number | não    | Estimativa de manutenção/mês (R$). Padrão: 0. |
+
+**Exemplo de request**
 ```json
 {
-  "vehicleLabel": "string",
-  "year": 2020,
-  "askingPrice": 35000.0,
-  "kmPerMonth": 800.0,
-  "kmPerLiter": 12.0,
-  "fuelPricePerLiter": 5.5,
-  "maintenanceMonthly": 100.0
+  "vehicleLabel": "Honda Civic 2018",
+  "year": 2018,
+  "askingPrice": 72000,
+  "kmPerMonth": 1200,
+  "kmPerLiter": 12.5,
+  "fuelPricePerLiter": 6.10,
+  "maintenanceMonthly": 200
 }
 ```
 
-Validation rules:
-- `vehicleLabel`: string, min length 3
-- `year`: integer between 1950 and currentYear+1
-- all numeric fields must be positive (except `maintenanceMonthly` which can be zero)
-
-Response (200):
-
+**Response 200**
 ```json
 {
-  "input": { /* echo of input */ },
+  "input": { ...campos enviados... },
   "result": {
-    "fuelMonthly": 436.5,
-    "monthlyTotal": 536.5,
+    "fuelMonthly": 585.60,
+    "monthlyTotal": 785.60,
     "pillars": {
-      "priceScore": 80,
-      "fuelScore": 50,
-      "maintenanceScore": 93,
-      "adequacyScore": 100
+      "priceScore": 72,
+      "fuelScore": 30,
+      "maintenanceScore": 80,
+      "adequacyScore": 90
     },
     "weights": {
       "price": 0.4,
@@ -56,45 +66,70 @@ Response (200):
       "maintenance": 0.2,
       "adequacy": 0.15
     },
-    "finalScore": 80,
-    "label": "compra_saudavel"
+    "finalScore": 66,
+    "label": "viavel_com_atencao"
   },
   "meta": {
-    "analysisId": 12
+    "analysisId": 1
   }
 }
 ```
 
-## GET /v1/analysis/history?limit=20
+**Labels possíveis**
 
-Returns the latest persisted analyses from PostgreSQL.
+| label                   | finalScore | Significado para o usuário     |
+|-------------------------|------------|-------------------------------|
+| compra_saudavel         | 80 – 100   | Boa compra para o seu perfil. |
+| viavel_com_atencao      | 60 – 79    | Viável, mas fique atento.     |
+| alto_custo_para_perfil  | 40 – 59    | Custo elevado para seu uso.   |
+| nao_recomendado         | 0 – 39     | Compra arriscada.             |
 
-Response (200):
+**Response 400**
+```json
+{
+  "error": "invalid_payload",
+  "details": { "fieldErrors": { "year": ["..."] }, "formErrors": [] }
+}
+```
 
+---
+
+## GET /v1/analysis/history
+
+Retorna as últimas análises salvas.
+
+**Query params**
+
+| Param | Tipo   | Padrão | Descrição                          |
+|-------|--------|--------|------------------------------------|
+| limit | number | 20     | Quantidade de itens (máx. 100).    |
+
+**Response 200**
 ```json
 {
   "items": [
     {
-      "id": 12,
-      "createdAt": "2026-03-27T00:10:11.123Z",
-      "vehicleLabel": "Fusca",
-      "year": 2010,
-      "askingPrice": 15000,
-      "monthlyTotal": 536.5,
-      "finalScore": 80,
-      "label": "compra_saudavel"
+      "id": 1,
+      "createdAt": "2026-03-30T16:00:00.000Z",
+      "vehicleLabel": "Honda Civic 2018",
+      "year": 2018,
+      "askingPrice": 72000,
+      "finalScore": 66,
+      "label": "viavel_com_atencao",
+      "monthlyTotal": 785.60
     }
   ],
   "count": 1
 }
 ```
 
+---
+
 ## GET /v1/config/weights
 
-Returns current scoring weights used by `analyze(...)`.
+Retorna os pesos atuais do score (normalizados, soma = 1).
 
-Response (200):
-
+**Response 200**
 ```json
 {
   "weights": {
@@ -106,44 +141,81 @@ Response (200):
 }
 ```
 
+---
+
 ## PUT /v1/config/weights
 
-Updates scoring weights. Values are normalized in the backend to sum `1.0`.
+Atualiza os pesos do score. Os valores são normalizados automaticamente (soma sempre vira 1).
 
-Request body:
+**Request body**
 
+| Campo       | Tipo   | Obrig. | Descrição                          |
+|-------------|--------|--------|------------------------------------|
+| price       | number | sim    | Peso do pilar de preço.            |
+| fuel        | number | sim    | Peso do pilar de combustível.      |
+| maintenance | number | sim    | Peso do pilar de manutenção.       |
+| adequacy    | number | sim    | Peso do pilar de adequação.        |
+
+**Exemplo de request**
 ```json
-{
-  "price": 0.5,
-  "fuel": 0.2,
-  "maintenance": 0.2,
-  "adequacy": 0.1
-}
+{ "price": 3, "fuel": 3, "maintenance": 2, "adequacy": 2 }
 ```
 
-Response (200):
-
+**Response 200** — pesos normalizados gravados
 ```json
 {
   "weights": {
-    "price": 0.5,
-    "fuel": 0.2,
+    "price": 0.3,
+    "fuel": 0.3,
     "maintenance": 0.2,
-    "adequacy": 0.1
+    "adequacy": 0.2
   }
 }
 ```
 
-## DB bootstrap and env vars
+**Response 400**
+```json
+{ "error": "invalid_weights", "message": "The sum of all weights must be greater than zero." }
+```
 
-The API initializes required tables automatically on startup (`analysis_weights` and `analysis_history`).
+---
 
-Default DB connection values (if env vars are not set):
-- `DB_HOST=localhost`
-- `DB_PORT=5432`
-- `DB_USER=carscore`
-- `DB_PASSWORD=carscore`
-- `DB_NAME=carscore`
+## Pilares do score — como são calculados
 
-Optional:
-- `DATABASE_URL` (takes precedence over individual vars)
+### Pilar 1 — Preço (price)
+Compara o preço pedido com uma referência interna de depreciação.
+- ≤ 80% da referência → 100 pts
+- ≥ 120% da referência → 0 pts
+- Entre 80% e 120% → interpolação linear
+
+### Pilar 2 — Combustível (fuel)
+Calcula gasto mensal = (km/mês ÷ km/l) × preço/l.
+- ≤ R$ 80/mês → 100 pts
+- ≥ R$ 800/mês → 0 pts
+- Entre R$ 80 e R$ 800 → interpolação linear
+
+### Pilar 3 — Manutenção (maintenance)
+Baseado no valor de maintenanceMonthly informado pelo usuário.
+- ≤ R$ 50/mês → 100 pts
+- ≥ R$ 800/mês → 0 pts
+- Entre R$ 50 e R$ 800 → interpolação linear
+
+### Pilar 4 — Adequação (adequacy)
+Avalia compatibilidade entre perfil de uso e veículo.
+- Penaliza km/mês alto com consumo baixo.
+- Penaliza consumo muito baixo (km/l < 8).
+
+### Score final
+```
+finalScore = priceScore × weight.price
+           + fuelScore  × weight.fuel
+           + maintenanceScore × weight.maintenance
+           + adequacyScore × weight.adequacy
+```
+
+---
+
+## Fontes de dados
+- Preço de referência: heurística interna de depreciação (v0.1). Fase 2 integrará FIPE.
+- Consumo: informado pelo usuário. Fase 2 integrará base Inmetro/PBE.
+- Manutenção: informada pelo usuário ou estimativa por faixa. Fase 2 integrará catálogo de peças.

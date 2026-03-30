@@ -3,6 +3,98 @@ import 'package:http/http.dart' as http;
 
 typedef ScoreWeights = Map<String, double>;
 
+class FipeBrand {
+  final String code;
+  final String name;
+  FipeBrand({required this.code, required this.name});
+  factory FipeBrand.fromJson(Map<String, dynamic> j) =>
+      FipeBrand(code: j['code'] as String, name: j['name'] as String);
+}
+
+class FipeModel {
+  final int code;
+  final String name;
+  FipeModel({required this.code, required this.name});
+  factory FipeModel.fromJson(Map<String, dynamic> j) =>
+      FipeModel(code: j['code'] as int, name: j['name'] as String);
+}
+
+class FipeYear {
+  final String code;
+  final String name;
+  FipeYear({required this.code, required this.name});
+  factory FipeYear.fromJson(Map<String, dynamic> j) =>
+      FipeYear(code: j['code'] as String, name: j['name'] as String);
+}
+
+class FipePrice {
+  final double referencePrice;
+  final String? referencePriceFormatted;
+  final String brand;
+  final String model;
+  final int yearModel;
+  final String fuel;
+  final String? referenceMonth;
+  final String source;
+  final String sourceName;
+  final bool isFallback;
+  FipePrice({
+    required this.referencePrice,
+    this.referencePriceFormatted,
+    required this.brand,
+    required this.model,
+    required this.yearModel,
+    required this.fuel,
+    this.referenceMonth,
+    this.source = 'brasilapi',
+    this.sourceName = 'BrasilAPI',
+    this.isFallback = false,
+  });
+  factory FipePrice.fromJson(Map<String, dynamic> j) => FipePrice(
+        referencePrice: (j['referencePrice'] as num).toDouble(),
+        referencePriceFormatted: j['referencePriceFormatted'] as String?,
+        brand: j['brand'] as String,
+        model: j['model'] as String,
+        yearModel: j['yearModel'] as int,
+        fuel: j['fuel'] as String,
+        referenceMonth: j['referenceMonth'] as String?,
+        source: j['source'] as String? ?? 'brasilapi',
+        sourceName: j['sourceName'] as String? ?? 'BrasilAPI',
+        isFallback: j['isFallback'] as bool? ?? false,
+      );
+}
+
+class VehicleConsumption {
+  final double urbanKmL;
+  final double roadKmL;
+  final double averageKmL;
+  final double? ethanolUrbanKmL;
+  final double? ethanolRoadKmL;
+  final double? ethanolAverageKmL;
+  final String fuel;
+  VehicleConsumption({
+    required this.urbanKmL,
+    required this.roadKmL,
+    required this.averageKmL,
+    this.ethanolUrbanKmL,
+    this.ethanolRoadKmL,
+    this.ethanolAverageKmL,
+    required this.fuel,
+  });
+  factory VehicleConsumption.fromJson(Map<String, dynamic> j) {
+    final c = j['consumption'] as Map<String, dynamic>;
+    return VehicleConsumption(
+      urbanKmL: (c['urbanKmL'] as num).toDouble(),
+      roadKmL: (c['roadKmL'] as num).toDouble(),
+      averageKmL: (c['averageKmL'] as num).toDouble(),
+      ethanolUrbanKmL: c['ethanolUrbanKmL'] != null ? (c['ethanolUrbanKmL'] as num).toDouble() : null,
+      ethanolRoadKmL: c['ethanolRoadKmL'] != null ? (c['ethanolRoadKmL'] as num).toDouble() : null,
+      ethanolAverageKmL: c['ethanolAverageKmL'] != null ? (c['ethanolAverageKmL'] as num).toDouble() : null,
+      fuel: j['fuel'] as String,
+    );
+  }
+}
+
 class ApiClient {
   ApiClient({this.baseUrl = 'http://localhost:3333'});
 
@@ -61,10 +153,165 @@ class ApiClient {
     };
   }
 
+  // ── Veículos ──────────────────────────────────────────────────────────────
+
+  Future<List<FipeBrand>> getBrands() async {
+    final uri = Uri.parse('$baseUrl/v1/vehicles/brands');
+    final resp = await http.get(uri);
+    final parsed = _parse(resp);
+    return (parsed['items'] as List<dynamic>)
+        .map((e) => FipeBrand.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  Future<List<FipeModel>> getModels(String brandCode) async {
+    final uri = Uri.parse('$baseUrl/v1/vehicles/models?brandCode=$brandCode');
+    final resp = await http.get(uri);
+    final parsed = _parse(resp);
+    return (parsed['items'] as List<dynamic>)
+        .map((e) => FipeModel.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  Future<List<FipeYear>> getYears(String brandCode, int modelCode) async {
+    final uri = Uri.parse('$baseUrl/v1/vehicles/years?brandCode=$brandCode&modelCode=$modelCode');
+    final resp = await http.get(uri);
+    final parsed = _parse(resp);
+    return (parsed['items'] as List<dynamic>)
+        .map((e) => FipeYear.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  Future<FipePrice> getFipePrice(String brandCode, int modelCode, String yearCode) async {
+    final uri = Uri.parse(
+        '$baseUrl/v1/vehicles/fipe-price?brandCode=$brandCode&modelCode=$modelCode&yearCode=$yearCode');
+    final resp = await http.get(uri);
+    return FipePrice.fromJson(_parse(resp));
+  }
+
+  Future<VehicleConsumption?> getConsumption(String brand, String model, int year) async {
+    final uri = Uri.parse(
+        '$baseUrl/v1/vehicles/consumption?brand=${Uri.encodeComponent(brand)}&model=${Uri.encodeComponent(model)}&year=$year');
+    final resp = await http.get(uri);
+    if (resp.statusCode == 404) return null;
+    return VehicleConsumption.fromJson(_parse(resp));
+  }
+
   Map<String, dynamic> _parse(http.Response resp) {
     final status = resp.statusCode;
     if (status < 200 || status >= 300) {
       throw Exception('Request failed (${resp.statusCode}): ${resp.body}');
+    }
+    return jsonDecode(resp.body) as Map<String, dynamic>;
+  }
+}
+
+// ── Marketplace ───────────────────────────────────────────────────────────────
+
+class MarketplaceOffer {
+  final String id;
+  final String title;
+  final double price;
+  final double fipeEstimate;
+  final double fipeDiff;
+  final String thumbnailUrl;
+  final String listingUrl;
+  final String region;
+  final String city;
+  final int km;
+  final String brand;
+  final String model;
+  final int year;
+  final String source;
+  final String sourceName;
+
+  MarketplaceOffer({
+    required this.id,
+    required this.title,
+    required this.price,
+    required this.fipeEstimate,
+    required this.fipeDiff,
+    required this.thumbnailUrl,
+    required this.listingUrl,
+    required this.region,
+    required this.city,
+    required this.km,
+    required this.brand,
+    required this.model,
+    required this.year,
+    required this.source,
+    required this.sourceName,
+  });
+
+  factory MarketplaceOffer.fromJson(Map<String, dynamic> j) => MarketplaceOffer(
+        id: j['id'] as String,
+        title: j['title'] as String,
+        price: (j['price'] as num).toDouble(),
+        fipeEstimate: (j['fipeEstimate'] as num).toDouble(),
+        fipeDiff: (j['fipeDiff'] as num).toDouble(),
+        thumbnailUrl: j['thumbnailUrl'] as String? ?? '',
+        listingUrl: j['listingUrl'] as String? ?? '',
+        region: j['region'] as String? ?? '',
+        city: j['city'] as String? ?? '',
+        km: (j['km'] as num? ?? 0).toInt(),
+        brand: j['brand'] as String? ?? '',
+        model: j['model'] as String? ?? '',
+        year: (j['year'] as num? ?? 0).toInt(),
+        source: j['source'] as String? ?? 'mercadolivre',
+        sourceName: j['sourceName'] as String? ?? 'Mercado Livre',
+      );
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'title': title,
+        'price': price,
+        'fipeEstimate': fipeEstimate,
+        'fipeDiff': fipeDiff,
+        'thumbnailUrl': thumbnailUrl,
+        'listingUrl': listingUrl,
+        'region': region,
+        'city': city,
+        'km': km,
+        'brand': brand,
+        'model': model,
+        'year': year,
+        'source': source,
+        'sourceName': sourceName,
+      };
+}
+
+extension ApiClientOffers on ApiClient {
+  Future<List<MarketplaceOffer>> getOffers({
+    String region = 'Sao Paulo',
+    int limit = 12,
+    String? brand,
+    String? model,
+    double? minPrice,
+    double? maxPrice,
+    int? maxKm,
+    int? minYear,
+  }) async {
+    final queryParameters = <String, String>{
+      'region': region,
+      'limit': '$limit',
+      if (brand != null && brand.trim().isNotEmpty) 'brand': brand.trim(),
+      if (model != null && model.trim().isNotEmpty) 'model': model.trim(),
+      if (minPrice != null) 'minPrice': minPrice.round().toString(),
+      if (maxPrice != null) 'maxPrice': maxPrice.round().toString(),
+      if (maxKm != null) 'maxKm': '$maxKm',
+      if (minYear != null) 'minYear': '$minYear',
+    };
+    final uri = Uri.parse('$baseUrl/v1/offers').replace(queryParameters: queryParameters);
+    final resp = await http.get(uri);
+    final parsed = _parseOffers(resp);
+    return (parsed['items'] as List<dynamic>)
+        .map((e) => MarketplaceOffer.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  Map<String, dynamic> _parseOffers(http.Response resp) {
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw Exception('Offers request failed (${resp.statusCode})');
     }
     return jsonDecode(resp.body) as Map<String, dynamic>;
   }

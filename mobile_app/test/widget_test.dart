@@ -18,12 +18,23 @@ void main() {
       'label': 'viavel_com_atencao',
     };
 
-    await tester.pumpWidget(MaterialApp(home: ResultPage(result: result)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ResultPage(
+          result: result,
+          vehicleLabel: 'Honda Civic',
+          year: 2020,
+          imageUrl: 'https://example.com/car.jpg',
+          askedPrice: 89000,
+          kmPerLiter: 12.5,
+          updatedAt: '30/03/2026 17:30',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-    expect(find.text('Score: 68'), findsOneWidget);
-    expect(find.text('Preço'), findsOneWidget);
-    expect(find.text('Combustível'), findsOneWidget);
-    expect(find.text('Manutenção'), findsOneWidget);
-    expect(find.text('Adequação'), findsOneWidget);
+    expect(find.text('Termometro de qualidade da compra'), findsOneWidget);
+    expect(find.text('Resumo financeiro'), findsOneWidget);
+    expect(find.textContaining('Preco pedido'), findsOneWidget);
   });
 }

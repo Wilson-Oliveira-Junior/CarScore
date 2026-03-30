@@ -1,168 +1,219 @@
 ﻿# CarScore
 
-Aplicativo mobile para ajudar na decisao de compra de carro usado em poucos segundos.
+Aplicativo mobile para decisao de compra de carro usado — analise rapida, comparativo FIPE e radar de ofertas regionais integrado com marketplaces.
 
 ## Visao do produto
 O usuario informa modelo, ano, preco pedido e perfil de uso.
 O app retorna uma leitura objetiva de viabilidade:
-- preco em relacao a referencia de mercado
+- preco em relacao a referencia FIPE (tabela oficial)
 - custo mensal estimado (combustivel + manutencao)
-- score final de 0 a 100
-- classificacao: compra saudavel / atencao / nao recomendado
+- score final de 0 a 100 com classificacao visual (termometro)
+- classificacao: Compra saudavel / Atencao / Nao recomendado
+- radar de ofertas reais do Mercado Livre com comparativo FIPE por regiao
 
-## Stack escolhida
-- Mobile: Flutter (Dart)
-- Backend API: Node.js + TypeScript (Fastify)
-- Banco de dados: PostgreSQL
+## Stack tecnica
+- **Mobile:** Flutter (Dart 3.x)
+- **Backend API:** Node.js + TypeScript 6 + Fastify (porta 3333)
+- **Banco de dados:** PostgreSQL (Docker)
+- **FIPE:** BrasilAPI + Parallelum/FIPE + fallback local completo (base Inmetro)
+- **Marketplace:** arquitetura de providers plugáveis (Mercado Livre + Base local), pronta para Webmotors/OLX no futuro
 
-## Estrutura atual do repositorio
-- `backend-api`: API de calculo e endpoints
-- `mobile_app`: app Flutter
-- `database`: ambiente local do PostgreSQL (Docker)
+## Estrutura do repositorio
+```
+backend-api/         API de calculo, FIPE e marketplace
+  src/
+    services/
+      fipe.ts        Integracao multi-provedor: BrasilAPI + Parallelum + fallback local
+      inmetro.ts     Base de consumo Inmetro (seed local)
+      offers/         Providers plugáveis de ofertas, agregação, filtros e fallback
+    routes/
+      vehicles.ts    Endpoints FIPE: /brands /models /years /fipe-price /consumption
+      offers.ts      Endpoint de ofertas: GET /v1/offers?region=&limit=
+    score.ts         Motor de scoring (4 pilares: preco, combustivel, manutencao, adequacao)
+    db.ts            PostgreSQL: historico + configuracao de pesos
+    server.ts        Bootstrap Fastify
 
-## Status atual
-Ja feito:
-- nome do projeto definido: CarScore
-- backend inicial criado em TypeScript com Fastify
-- endpoint de health criado
-- endpoint inicial de estimativa criado
-- scripts de build/dev configurados
-- docker-compose do banco criado
+mobile_app/          App Flutter
+  lib/
+    core/
+      api_client.dart     HTTP client + modelos: FipeBrand, MarketplaceOffer, etc.
+      app_theme.dart      Tema visual (cores, tipografia, espacamento)
+    features/
+      shell/              NavigationBar com 4 abas
+      dashboard/          Radar de oportunidades (mapa + hotspots + lista ML)
+      analysis/           Formulario de analise + tela de resultado
+      history/            Historico de analises + monitor de pecas
+      settings/           Pesos do score + perfil do usuario
 
-Pendente imediato:
-- instalar Flutter no ambiente (você instalou e confirmou com `flutter doctor`)
-- gerar projeto mobile (feito: `mobile_app` criado com `flutter create .`)
-- conectar app na API (feito: ApiClient + telas de formulário/resultado)
-- evoluir score v0.1 para score com 4 pilares (feito no backend v1)
+database/            Docker Compose do PostgreSQL local
+```
 
-Status detalhado — o que já fizemos (delta):
-- Backend
-	- extraída lógica de scoring para `src/score.ts` e ajustadas heurísticas/pesos
-	- endpoint POST `/v1/analysis/estimate` retorna sub-scores por pilar, pesos, finalScore e label
-	- persistência em PostgreSQL de análises (`analysis_history`)
-	- endpoints para histórico e configuração de pesos: `/v1/analysis/history`, `/v1/config/weights`
-	- testes unitários do scoring adicionados (Vitest) em `backend-api/test`
-	- arquivo de documentação da API: `backend-api/API.md`
+## Funcionalidades implementadas
 
-- Mobile (Flutter)
-	- projeto criado em `mobile_app` (com `flutter create .`)
-	- `lib/core/api_client.dart` — cliente HTTP para `http://localhost:3333`
-	- `lib/features/analysis/analysis_page.dart` — formulário para envio de dados de análise
-	- `lib/features/analysis/result_page.dart` — UI de resultado com barras por pilar e explicações
-	- tema visual aplicado (cores/tipografia/espaçamento base) em `lib/core/app_theme.dart`
-	- shell com abas em `lib/features/shell/app_shell.dart` (Início, Análise, Histórico, Config)
-	- `lib/features/history/history_page.dart` conectado ao histórico real da API
-	- `lib/features/settings/settings_page.dart` com sliders para ajuste real de pesos do score
-	- adicionada dependência `http` em `mobile_app/pubspec.yaml`
-	- teste widget básico em `mobile_app/test/` para `ResultPage`
+## Progresso consolidado
 
-- Conveniência / dev scripts
-	- `run_all.ps1` — sobe DB (docker), backend (npm run dev) e app Flutter web (flutter run -d chrome) em novas janelas PowerShell
-	- `run_git_push.ps1` — inicializa repo (se necessário), adiciona remote e faz commit+push para o GitHub remoto
-	- `.gitignore` adicionado na raiz com padrões para Node/Flutter/IDE
+### Entregas realizadas nesta fase
+- Refatoracao completa da UX principal do app: inicio, analise, resultado, historico e configuracoes
+- Integracao FIPE com cadeia de resiliencia real: BrasilAPI -> Parallelum/FIPE -> base local
+- Integracao de ofertas regionais com arquitetura de providers plugaveis
+- Radar de oportunidades com comparativo FIPE, hotspots e origem do dado visivel na interface
+- Busca de ofertas com filtros reais no backend e no app: regiao, marca, modelo, preco e quilometragem
+- Imagens com fallback progressivo: thumbnail do anuncio -> busca externa -> icone local
+- Melhorias de navegacao e pre-preenchimento entre busca FIPE, analise e resultado
+- Ajustes de estabilidade do backend, cache em memoria e fallbacks operacionais
+
+### Validado localmente
+- Build do backend TypeScript concluido com sucesso
+- `dart analyze lib/` sem issues
+- Endpoint de busca FIPE respondendo com `source`, `sourceName` e `isFallback`
+- Endpoint de ofertas respondendo com filtros por marca/modelo/preco/km
+- Fallback de ofertas validado com `Toyota Corolla`, preco maximo e km maximo
+- Banco PostgreSQL local iniciado via Docker Compose
+
+### Tela Inicio — Radar de Oportunidades
+- **Integracao real com Mercado Livre:** busca veiculos usados por cidade/estado via API publica MLB
+- **Comparativo FIPE automatico:** cada oferta exibe preco pedido vs. estimativa FIPE + diferenca em R$
+- **Hotspots no mapa:** bolhas coloridas posicionadas sobre mapa estilo cartografia (verde = abaixo da FIPE, vermelho = acima)
+- **Badge de fonte:** label "Mercado Livre" (azul) ou "Base local" (cinza) em cada oferta
+- **Fallback robusto:** quando ML esta fora do ar, exibe dados semeados (15 ofertas de grandes cidades)
+- **Thumbnail do anuncio:** imagem real do anuncio ML; fallback via Unsplash por marca+modelo
+- **Botao "Ver anuncio":** abre o link do ML diretamente (url_launcher)
+- **Botao "Analisar":** atalho para busca FIPE pre-preenchida
+- **Pull-to-refresh e botao de atualizar**
+- **Campo de regiao** com busca ao pressionar Enter
+- **Filtros reais de busca:** marca, modelo, preco maximo e quilometragem maxima
+
+### Tela Analise — Formulario detalhado
+- Banner hero com imagem do veiculo (Unsplash)
+- Dica contextual sobre consulta FIPE anterior
+- Campos com icones: modelo, ano, preco, km/mes, combustivel, litro preco, manutencao
+- Botao adaptativo ("Gerar score detalhado" se vier de busca FIPE, "Analisar agora" senao)
+
+### Tela Resultado — Score detalhado
+- **Termometro visual** (degradê vermelho → laranja → verde) com marcador animado
+- Imagem do veiculo (Unsplash por modelo)
+- **Resumo financeiro:** preco pedido, ref. FIPE, km/l, tipo de combustivel, custo mensal
+- Barras de progresso por pilar (preco, combustivel, manutencao, adequacao)
+- Rodape com pesos usados e timestamp da analise
+
+### Tela Busca de Veiculo (FIPE)
+- Cascata: Marca → Modelo → Ano → Preco FIPE + Consumo Inmetro
+- Exibe claramente a origem do valor FIPE: BrasilAPI, Parallelum/FIPE ou Base local
+- Preview da imagem do veiculo ao selecionar o modelo
+- Passa dados pre-preenchidos para o formulario de analise
+
+### Tela Historico
+- Aba "Carros": historico real da API (PostgreSQL)
+- Aba "Pecas": monitor de pecas com botao "Adicionar" (dialog)
+
+### Tela Configuracoes
+- Sliders de pesos por pilar com explicacao de cada criterio
+- Perfil do usuario: cidade, orcamento-alvo, preco do litro, preferencias (switches)
+
+## Resiliencia das APIs
+
+| Servico | Primario | Fallback 1 | Fallback 2 |
+|---|---|---|---|
+| FIPE marcas/modelos/anos/preco | BrasilAPI | Parallelum/FIPE | Base Inmetro local |
+| Ofertas regionais | Provider Mercado Livre | Provider Base local | Proximos providers: Webmotors/OLX |
+| Imagens de veiculos | Thumbnail ML (foto real) | Unsplash (busca por modelo) | Icone padrao |
+
+O cache em memoria do backend (10 min TTL) reduz chamadas externas e protege contra instabilidade.
+
+## Endpoints da API
+
+```
+GET  /health
+POST /v1/analysis/estimate
+GET  /v1/analysis/history?limit=
+GET  /v1/config/weights
+PUT  /v1/config/weights
+GET  /v1/vehicles/brands
+GET  /v1/vehicles/models?brandCode=
+GET  /v1/vehicles/years?brandCode=&modelCode=
+GET  /v1/vehicles/fipe-price?brandCode=&modelCode=&yearCode=
+GET  /v1/vehicles/consumption?brand=&model=&year=
+GET  /v1/offers?region=&limit=
+```
 
 ## Como rodar localmente
+
 ### 1) Requisitos
-- Node.js 20+ (ja disponivel)
-- npm 10+ (ja disponivel)
-- Docker Desktop (para banco local)
-- Flutter SDK (a instalar)
+- Node.js 20+ e npm 10+
+- Docker Desktop
+- Flutter SDK 3.x
 
-### 2) Subir o banco local
-Na pasta `database`:
-
-```bash
+### 2) Banco de dados
+```powershell
+cd database
 docker compose up -d
 ```
 
-### 3) Rodar a API
-Na pasta `backend-api`:
-
-```bash
+### 3) Backend
+```powershell
+cd backend-api
 npm install
 npm run dev
 ```
 
-Teste rapido:
-
-```bash
-GET http://localhost:3333/health
-```
-
-### 4) Instalar Flutter (Windows)
-Passo resumido:
-1. baixar Flutter SDK oficial
-2. extrair em `C:\src\flutter`
-3. adicionar `C:\src\flutter\bin` no PATH
-4. reiniciar terminal
-5. executar `flutter doctor`
-
-Observação: o projeto Flutter já foi criado no diretório `mobile_app` neste repositório. Para rodar a aplicação web (Chrome):
-
+### 4) App Flutter (Chrome)
 ```powershell
-Set-Location D:\Projeto\CarScore\mobile_app
+cd mobile_app
 flutter pub get
 flutter run -d chrome
 ```
 
-Para testar o fluxo completo, certifique-se que o backend está rodando (`npm run dev`) e utilize a opção "Nova análise (formulário)" no app web.
-
 ### Testes
-- Backend: na pasta `backend-api`
-
 ```powershell
-npm install
-npm test
+# Backend
+cd backend-api ; npm test
+
+# Mobile
+cd mobile_app ; flutter test
 ```
 
-- Mobile: na pasta `mobile_app`
+## Score — 4 pilares
 
-```powershell
-flutter test
-```
+| Pilar | O que avalia |
+|---|---|
+| Preco | Distancia do preco pedido em relacao a tabela FIPE |
+| Combustivel | Custo mensal estimado (km/mes ÷ km/l × preco litro) |
+| Manutencao | Custo fixo mensal com manutencao informado |
+| Adequacao | Relacao custo-beneficio dado o perfil de uso |
 
-## Regras de calculo (v0.1)
-Combustivel:
+Pesos configuráveis pelo usuario na aba Configuracoes (padrao: 25% cada).
 
-```text
-gasto_mensal_combustivel = (km_mes / km_por_litro) * preco_litro
-```
+## Historico de evolucao
 
-Total mensal:
+- **2026-03-26:** planejamento e bootstrap tecnico (backend, banco, estrutura)
+- **2026-03-30:** pipeline CI (GitHub Actions), Flutter configurado
+- **2026-03-30:** redesign completo de todas as 5 telas (UX, termometro, comparativos)
+- **2026-03-30:** integracao FIPE com fallback local completo (BrasilAPI + Inmetro)
+- **2026-03-30:** integracao FIPE multi-provedor com Parallelum/FIPE como fonte secundaria
+- **2026-03-30:** integracao Mercado Livre com fallback semeado para 15 ofertas / 10 cidades
+- **2026-03-30:** mapa de hotspots com dados reais, badge de fonte, link direto ao anuncio
+- **2026-03-30:** arquitetura de offers providers preparada para futuras fontes como Webmotors e OLX
+- **2026-03-30:** filtros server-side e client-side para marca, modelo, preco e quilometragem
 
-```text
-custo_mensal_total = gasto_mensal_combustivel + manutencao_mensal_estimada
-```
+## Proximos passos
 
-Score atual (provisorio no backend):
-- calcula score com base no custo mensal total
-- proxima versao usara 4 pilares: preco, combustivel, manutencao, adequacao
+### Curto prazo
+1. Adicionar selecao de providers e filtro de ano minimo na interface do dashboard
+2. Criar endpoint de saude dos providers para a UI indicar quando esta em fallback
+3. Melhorar deduplicacao e ranqueamento das ofertas por relevancia e qualidade do anuncio
 
-## Proximos passos (Sprint 1)
-1. Definir contrato da API (payloads finais)
-2. Refinar heurísticas e pesos do scoring (já existe implementação inicial em `backend-api/src/score.ts`)
-3. Melhorar UX do resultado (gráficos, explicações detalhadas, recomendações)
-4. Persistência: salvar análises em banco e criar endpoints para histórico/comparação (já implementado no MVP)
-5. Criar builds Android/iOS (configurar Android SDK / AVD e Visual Studio para Windows)
-6. Adicionar CI: rodar `npm test` (backend) e `flutter test` (mobile) em GitHub Actions
+### Medio prazo
+1. Implementar novos providers reais assim que houver fonte estavel ou parceria viavel
+2. Salvar buscas, filtros e alertas por usuario para monitoramento continuo de oportunidades
+3. Evoluir o comparativo financeiro com custo total de posse e projecao anual
 
-Checklist curto (concluído / pendente):
-- [x] Backend básico + endpoints
-- [x] Docker compose do DB
-- [x] Projeto Flutter criado
-- [x] Conexão mobile ↔ backend (API client + formulário)
-- [x] Score com 4 pilares e testes unitários
-- [x] Tema visual aplicado nas telas novas
-- [x] Persistência de análises no Postgres + histórico
-- [x] Ajuste real de pesos em Configurações
-- [x] Script dev `run_all.ps1` e helper `run_git_push.ps1`
-- [ ] CI (GitHub Actions)
-- [ ] Testes de integração end-to-end
-
-## Historico
-- 2026-03-26: planejamento inicial do produto
-- 2026-03-26: bootstrap tecnico inicial (backend, banco, estrutura de pastas)
+### Longo prazo
+1. Transformar o CarScore em referencia de decisao de compra com monitoramento continuo do mercado
+2. Adicionar experiencia mobile completa em Android/iOS com notificacoes e favoritos
+3. Integrar mais fontes de dados veiculares, historico, manutencao e revenda
 
 ## Observacoes
-- O app deve exibir valores como referencia e estimativa.
+- Valores de FIPE podem vir de BrasilAPI, Parallelum/FIPE ou base local; o app agora mostra a origem do dado ao usuario.
 - Preco, consumo e manutencao podem variar por regiao, versao e condicao do veiculo.
+- Android e Windows desktop requerem, respectivamente, Android SDK e Visual Studio C++ toolchain.
+
