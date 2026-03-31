@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { getAvailableOfferProviders, searchOffers } from '../services/offers';
+import { getAvailableOfferProviders, getOfferProvidersHealth, normalizeProviderList, searchOffers } from '../services/offers';
+import { OfferSource } from '../services/offers/types';
 
 const QuerySchema = z.object({
   region: z.string().min(1).max(120).default('Sao Paulo'),
@@ -18,18 +19,32 @@ const QuerySchema = z.object({
       value
         ?.split(',')
         .map((item) => item.trim())
-        .filter(Boolean) as Array<'mercadolivre' | 'local'> | undefined
+        .filter(Boolean) as OfferSource[] | undefined
     ),
 });
 
 export async function offersRoutes(app: FastifyInstance) {
+  app.get('/v1/offers/providers/health', async () => {
+    const providers = await getOfferProvidersHealth();
+    return {
+      providers,
+      count: providers.length,
+      healthyCount: providers.filter((item) => item.healthy).length,
+      fallbackRecommended: providers.some((item) => !item.healthy),
+    };
+  });
+
   app.get('/v1/offers', async (request, reply) => {
     const parsed = QuerySchema.safeParse(request.query);
     if (!parsed.success) {
       return reply.status(400).send({ error: 'invalid_query', details: parsed.error.flatten() });
     }
 
-    const result = await searchOffers(parsed.data);
+    const normalizedProviders = normalizeProviderList(parsed.data.providers);
+    const result = await searchOffers({
+      ...parsed.data,
+      providers: normalizedProviders,
+    });
 
     return {
       items: result.items,
@@ -43,6 +58,7 @@ export async function offersRoutes(app: FastifyInstance) {
         maxKm: parsed.data.maxKm ?? null,
         minYear: parsed.data.minYear ?? null,
       },
+      requestedProviders: normalizedProviders,
       providersUsed: result.providersUsed,
       fallbackUsed: result.fallbackUsed,
       availableProviders: getAvailableOfferProviders(),

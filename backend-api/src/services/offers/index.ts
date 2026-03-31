@@ -1,10 +1,14 @@
 import { mercadoLivreProvider } from './mercadoLivre';
 import { seededOffersProvider } from './seeded';
+import { webmotorsStubProvider } from './webmotorsStub';
+import { olxStubProvider } from './olxStub';
 import { MarketplaceOffer, OffersProvider, OffersSearchFilters, OffersSearchResult, OfferSource } from './types';
 
 const providers: Record<OfferSource, OffersProvider> = {
   mercadolivre: mercadoLivreProvider,
   local: seededOffersProvider,
+  webmotors: webmotorsStubProvider,
+  olx: olxStubProvider,
 };
 
 function normalize(value?: string): string {
@@ -48,14 +52,54 @@ function dedupeOffers(items: MarketplaceOffer[]): MarketplaceOffer[] {
   return result;
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function computeQualityScore(offer: MarketplaceOffer): number {
+  const bargainScore = clamp((offer.fipeDiff / Math.max(1, offer.fipeEstimate)) * 100, -20, 20) + 50;
+  const kmPenalty = offer.km > 0 ? clamp((offer.km - 50000) / 2500, 0, 20) : 8;
+  const yearBonus = offer.year > 0 ? clamp((offer.year - 2016) * 1.8, 0, 16) : 0;
+  const imageBonus = offer.thumbnailUrl.length > 0 ? 5 : 0;
+  const linkBonus = offer.listingUrl.length > 0 ? 4 : 0;
+  const sourceBonus = offer.source === 'mercadolivre' ? 5 : 0;
+
+  const raw = bargainScore - kmPenalty + yearBonus + imageBonus + linkBonus + sourceBonus;
+  return clamp(Math.round(raw), 0, 100);
+}
+
+export function normalizeProviderList(raw?: OfferSource[]): OfferSource[] {
+  if (!raw || raw.length === 0) return ['mercadolivre'];
+  const valid = raw.filter((item): item is OfferSource => item in providers);
+  return valid.length > 0 ? Array.from(new Set(valid)) : ['mercadolivre'];
+}
+
 export function getAvailableOfferProviders(): Array<{ id: OfferSource; name: string }> {
   return Object.values(providers).map((provider) => ({ id: provider.id, name: provider.name }));
 }
 
+export async function getOfferProvidersHealth() {
+  const checks = await Promise.all(
+    Object.values(providers).map(async (provider) => {
+      const started = Date.now();
+      const status = provider.healthCheck
+        ? await provider.healthCheck()
+        : { healthy: false, note: 'no_health_check_implemented' };
+      return {
+        id: provider.id,
+        name: provider.name,
+        healthy: status.healthy,
+        latencyMs: status.latencyMs ?? Date.now() - started,
+        note: status.note ?? null,
+      };
+    })
+  );
+
+  return checks;
+}
+
 export async function searchOffers(filters: OffersSearchFilters): Promise<OffersSearchResult> {
-  const requested: OfferSource[] = filters.providers?.length
-    ? filters.providers
-    : ['mercadolivre'];
+  const requested = normalizeProviderList(filters.providers);
   const activeProviders = requested.map((id) => providers[id]).filter(Boolean);
   const providersUsed: OfferSource[] = [];
   const collected: MarketplaceOffer[] = [];
@@ -80,7 +124,12 @@ export async function searchOffers(filters: OffersSearchFilters): Promise<Offers
 
   const filtered = dedupeOffers(collected)
     .filter((item) => matchesFilters(item, filters))
-    .sort((a, b) => a.price - b.price)
+    .map((item) => ({ ...item, qualityScore: computeQualityScore(item) }))
+    .sort((a, b) => {
+      const qualityDelta = (b.qualityScore ?? 0) - (a.qualityScore ?? 0);
+      if (qualityDelta !== 0) return qualityDelta;
+      return a.price - b.price;
+    })
     .slice(0, filters.limit);
 
   return {

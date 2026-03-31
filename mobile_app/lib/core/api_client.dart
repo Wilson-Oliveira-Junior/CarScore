@@ -224,6 +224,7 @@ class MarketplaceOffer {
   final int year;
   final String source;
   final String sourceName;
+  final int qualityScore;
 
   MarketplaceOffer({
     required this.id,
@@ -241,6 +242,7 @@ class MarketplaceOffer {
     required this.year,
     required this.source,
     required this.sourceName,
+    this.qualityScore = 0,
   });
 
   factory MarketplaceOffer.fromJson(Map<String, dynamic> j) => MarketplaceOffer(
@@ -259,6 +261,7 @@ class MarketplaceOffer {
         year: (j['year'] as num? ?? 0).toInt(),
         source: j['source'] as String? ?? 'mercadolivre',
         sourceName: j['sourceName'] as String? ?? 'Mercado Livre',
+        qualityScore: (j['qualityScore'] as num? ?? 0).toInt(),
       );
 
   Map<String, dynamic> toMap() => {
@@ -277,7 +280,33 @@ class MarketplaceOffer {
         'year': year,
         'source': source,
         'sourceName': sourceName,
+        'qualityScore': qualityScore,
       };
+}
+
+class OfferProviderHealth {
+  final String id;
+  final String name;
+  final bool healthy;
+  final int latencyMs;
+  final String? note;
+
+  OfferProviderHealth({
+    required this.id,
+    required this.name,
+    required this.healthy,
+    required this.latencyMs,
+    this.note,
+  });
+
+  factory OfferProviderHealth.fromJson(Map<String, dynamic> j) =>
+      OfferProviderHealth(
+        id: j['id'] as String,
+        name: j['name'] as String,
+        healthy: j['healthy'] as bool? ?? false,
+        latencyMs: (j['latencyMs'] as num? ?? 0).toInt(),
+        note: j['note'] as String?,
+      );
 }
 
 extension ApiClientOffers on ApiClient {
@@ -290,6 +319,7 @@ extension ApiClientOffers on ApiClient {
     double? maxPrice,
     int? maxKm,
     int? minYear,
+    List<String>? providers,
   }) async {
     final queryParameters = <String, String>{
       'region': region,
@@ -300,12 +330,23 @@ extension ApiClientOffers on ApiClient {
       if (maxPrice != null) 'maxPrice': maxPrice.round().toString(),
       if (maxKm != null) 'maxKm': '$maxKm',
       if (minYear != null) 'minYear': '$minYear',
+      if (providers != null && providers.isNotEmpty) 'providers': providers.join(','),
     };
     final uri = Uri.parse('$baseUrl/v1/offers').replace(queryParameters: queryParameters);
     final resp = await http.get(uri);
     final parsed = _parseOffers(resp);
     return (parsed['items'] as List<dynamic>)
         .map((e) => MarketplaceOffer.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  Future<List<OfferProviderHealth>> getOffersProvidersHealth() async {
+    final uri = Uri.parse('$baseUrl/v1/offers/providers/health');
+    final resp = await http.get(uri);
+    final parsed = _parseOffers(resp);
+    return (parsed['providers'] as List<dynamic>)
+        .map((e) => OfferProviderHealth.fromJson(
+            Map<String, dynamic>.from(e as Map)))
         .toList();
   }
 

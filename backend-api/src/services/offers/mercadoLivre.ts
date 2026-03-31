@@ -44,6 +44,27 @@ function buildQuery(filters: OffersSearchFilters): string {
 export const mercadoLivreProvider: OffersProvider = {
   id: 'mercadolivre',
   name: 'Mercado Livre',
+  async healthCheck() {
+    const started = Date.now();
+    try {
+      const url = `${ML_BASE}/sites/MLB/search?category=${ML_CARS_CATEGORY}&q=carro&limit=1`;
+      const res = await fetch(url, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(5000),
+      });
+      return {
+        healthy: res.ok,
+        latencyMs: Date.now() - started,
+        note: res.ok ? 'ok' : `http_${res.status}`,
+      };
+    } catch {
+      return {
+        healthy: false,
+        latencyMs: Date.now() - started,
+        note: 'timeout_or_network_error',
+      };
+    }
+  },
   async search(filters: OffersSearchFilters): Promise<MarketplaceOffer[]> {
     const query = buildQuery(filters);
     const cacheKey = JSON.stringify({

@@ -1,4 +1,4 @@
-export type OfferSource = 'mercadolivre' | 'local';
+export type OfferSource = 'mercadolivre' | 'local' | 'webmotors' | 'olx';
 
 export type MarketplaceOffer = {
   id: string;
@@ -16,6 +16,7 @@ export type MarketplaceOffer = {
   year: number;
   source: OfferSource;
   sourceName: string;
+  qualityScore?: number;
 };
 
 export type OffersSearchFilters = {
@@ -40,4 +41,5 @@ export interface OffersProvider {
   id: OfferSource;
   name: string;
   search(filters: OffersSearchFilters): Promise<MarketplaceOffer[]>;
+  healthCheck?(): Promise<{ healthy: boolean; latencyMs?: number; note?: string }>;
 }

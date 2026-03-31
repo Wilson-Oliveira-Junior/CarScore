@@ -57,7 +57,8 @@ database/            Docker Compose do PostgreSQL local
 - Integracao FIPE com cadeia de resiliencia real: BrasilAPI -> Parallelum/FIPE -> base local
 - Integracao de ofertas regionais com arquitetura de providers plugaveis
 - Radar de oportunidades com comparativo FIPE, hotspots e origem do dado visivel na interface
-- Busca de ofertas com filtros reais no backend e no app: regiao, marca, modelo, preco e quilometragem
+- Busca de ofertas com filtros reais no backend e no app: regiao, marca, modelo, preco, quilometragem, ano minimo e providers
+- Ranking de ofertas por qualidade com deduplicacao server-side
 - Imagens com fallback progressivo: thumbnail do anuncio -> busca externa -> icone local
 - Melhorias de navegacao e pre-preenchimento entre busca FIPE, analise e resultado
 - Ajustes de estabilidade do backend, cache em memoria e fallbacks operacionais
@@ -66,7 +67,9 @@ database/            Docker Compose do PostgreSQL local
 - Build do backend TypeScript concluido com sucesso
 - `dart analyze lib/` sem issues
 - Endpoint de busca FIPE respondendo com `source`, `sourceName` e `isFallback`
-- Endpoint de ofertas respondendo com filtros por marca/modelo/preco/km
+- Endpoint de ofertas respondendo com filtros por marca/modelo/preco/km/ano/providers
+- Endpoint de saude dos providers de ofertas respondendo com status e fallback
+- Ranking com `qualityScore` retornando na busca de ofertas
 - Fallback de ofertas validado com `Toyota Corolla`, preco maximo e km maximo
 - Banco PostgreSQL local iniciado via Docker Compose
 
@@ -81,7 +84,11 @@ database/            Docker Compose do PostgreSQL local
 - **Botao "Analisar":** atalho para busca FIPE pre-preenchida
 - **Pull-to-refresh e botao de atualizar**
 - **Campo de regiao** com busca ao pressionar Enter
-- **Filtros reais de busca:** marca, modelo, preco maximo e quilometragem maxima
+- **Filtros reais de busca:** marca, modelo, preco maximo, quilometragem maxima, ano minimo e selecao de providers
+- **Ranking de qualidade:** ordenacao por `qualityScore` com deduplicacao de anuncios semelhantes
+- **Indicador global de modo fallback:** banner no topo informando operacao normal/degradada
+- **Persistencia local de filtros recentes:** chips de buscas recentes com reaplicacao rapida
+- **Loading premium:** skeleton com animacao leve e transicao suave para o conteudo
 
 ### Tela Analise — Formulario detalhado
 - Banner hero com imagem do veiculo (Unsplash)
@@ -116,7 +123,7 @@ database/            Docker Compose do PostgreSQL local
 |---|---|---|---|
 | FIPE marcas/modelos/anos/preco | BrasilAPI | Parallelum/FIPE | Base Inmetro local |
 | Ofertas regionais | Provider Mercado Livre | Provider Base local | Proximos providers: Webmotors/OLX |
-| Imagens de veiculos | Thumbnail ML (foto real) | Unsplash (busca por modelo) | Icone padrao |
+| Imagens de veiculos | Thumbnail ML (foto real) | Wikipedia PageImages (por modelo) | Icone padrao |
 
 O cache em memoria do backend (10 min TTL) reduz chamadas externas e protege contra instabilidade.
 
@@ -133,7 +140,8 @@ GET  /v1/vehicles/models?brandCode=
 GET  /v1/vehicles/years?brandCode=&modelCode=
 GET  /v1/vehicles/fipe-price?brandCode=&modelCode=&yearCode=
 GET  /v1/vehicles/consumption?brand=&model=&year=
-GET  /v1/offers?region=&limit=
+GET  /v1/offers?region=&brand=&model=&minPrice=&maxPrice=&maxKm=&minYear=&providers=&limit=
+GET  /v1/offers/providers/health
 ```
 
 ## Como rodar localmente
@@ -194,23 +202,36 @@ Pesos configuráveis pelo usuario na aba Configuracoes (padrao: 25% cada).
 - **2026-03-30:** mapa de hotspots com dados reais, badge de fonte, link direto ao anuncio
 - **2026-03-30:** arquitetura de offers providers preparada para futuras fontes como Webmotors e OLX
 - **2026-03-30:** filtros server-side e client-side para marca, modelo, preco e quilometragem
+- **2026-03-31:** dashboard com selecao de providers e filtro de ano minimo
+- **2026-03-31:** endpoint de saude dos providers e ranking por `qualityScore`
+- **2026-03-31:** indicador global de fallback no topo do dashboard
+- **2026-03-31:** persistencia local de filtros recentes no dashboard
+- **2026-03-31:** skeleton animado e transicao suave entre carregamento e conteudo
+- **2026-03-31:** imagens corrigidas com Wikipedia PageImages API: foto coerente com modelo (15/15 validados)
 
-## Proximos passos
+## Status do roadmap
 
 ### Curto prazo
-1. Adicionar selecao de providers e filtro de ano minimo na interface do dashboard
-2. Criar endpoint de saude dos providers para a UI indicar quando esta em fallback
-3. Melhorar deduplicacao e ranqueamento das ofertas por relevancia e qualidade do anuncio
+1. Adicionar selecao de providers e filtro de ano minimo na interface do dashboard: **Concluido**
+2. Criar endpoint de saude dos providers para a UI indicar quando esta em fallback: **Concluido (backend + indicador visual no dashboard)**
+3. Melhorar deduplicacao e ranqueamento das ofertas por relevancia e qualidade do anuncio: **Concluido (qualityScore + dedupe no backend)**
 
 ### Medio prazo
-1. Implementar novos providers reais assim que houver fonte estavel ou parceria viavel
-2. Salvar buscas, filtros e alertas por usuario para monitoramento continuo de oportunidades
-3. Evoluir o comparativo financeiro com custo total de posse e projecao anual
+1. Implementar novos providers reais assim que houver fonte estavel ou parceria viavel: **Parcial (stubs Webmotors/OLX prontos)**
+2. Salvar buscas, filtros e alertas por usuario para monitoramento continuo de oportunidades: **Parcial (filtros recentes locais concluidos; alertas e conta de usuario pendentes)**
+3. Evoluir o comparativo financeiro com custo total de posse e projecao anual: **Pendente**
 
 ### Longo prazo
-1. Transformar o CarScore em referencia de decisao de compra com monitoramento continuo do mercado
-2. Adicionar experiencia mobile completa em Android/iOS com notificacoes e favoritos
-3. Integrar mais fontes de dados veiculares, historico, manutencao e revenda
+1. Transformar o CarScore em referencia de decisao de compra com monitoramento continuo do mercado: **Em andamento (base pronta)**
+2. Adicionar experiencia mobile completa em Android/iOS com notificacoes e favoritos: **Pendente**
+3. Integrar mais fontes de dados veiculares, historico, manutencao e revenda: **Parcial (arquitetura plugavel pronta)**
+
+## Proximos passos atualizados
+
+### Prioridade imediata
+1. Ajustar pesos do `qualityScore` com base em testes reais de mercado
+2. Evoluir persistencia local para persistencia por usuario (com alertas)
+3. Exibir explicacao de score de oportunidade por card (por que esta bom/ruim)
 
 ## Observacoes
 - Valores de FIPE podem vir de BrasilAPI, Parallelum/FIPE ou base local; o app agora mostra a origem do dado ao usuario.
