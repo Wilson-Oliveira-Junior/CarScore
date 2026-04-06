@@ -96,7 +96,12 @@ class VehicleConsumption {
 }
 
 class ApiClient {
-  ApiClient({this.baseUrl = 'http://localhost:3333'});
+  ApiClient({String? baseUrl})
+      : baseUrl = baseUrl ??
+            const String.fromEnvironment(
+              'API_BASE_URL',
+              defaultValue: 'http://localhost:3333',
+            );
 
   final String baseUrl;
 
@@ -107,20 +112,72 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> estimate(Map<String, dynamic> body) async {
+    final payload = Map<String, dynamic>.from(body);
     final uri = Uri.parse('$baseUrl/v1/analysis/estimate');
     final resp = await http.post(uri,
-        headers: {'Content-Type': 'application/json'}, body: jsonEncode(body));
+        headers: {'Content-Type': 'application/json'}, body: jsonEncode(payload));
     return _parse(resp);
   }
 
-  Future<List<Map<String, dynamic>>> history({int limit = 20}) async {
-    final uri = Uri.parse('$baseUrl/v1/analysis/history?limit=$limit');
+  Future<Map<String, dynamic>> estimateWithParts({
+    required Map<String, dynamic> analysis,
+    required Map<String, dynamic> parts,
+    String? clientId,
+    Map<String, dynamic>? weights,
+  }) async {
+    final uri = Uri.parse('$baseUrl/v1/analysis/estimate-with-parts');
+    final body = <String, dynamic>{
+      'analysis': analysis,
+      'parts': parts,
+    };
+    if (weights != null) {
+      body['weights'] = weights;
+    }
+    if (clientId != null && clientId.trim().isNotEmpty) {
+      body['clientId'] = clientId.trim();
+    }
+    final resp = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
+    return _parse(resp);
+  }
+
+  Future<Map<String, dynamic>> estimateParts(Map<String, dynamic> body) async {
+    final uri = Uri.parse('$baseUrl/v1/parts/estimate');
+    final resp = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
+    return _parse(resp);
+  }
+
+  Future<List<Map<String, dynamic>>> history({int limit = 20, String? clientId}) async {
+    final query = <String, String>{'limit': '$limit'};
+    if (clientId != null && clientId.trim().isNotEmpty) {
+      query['clientId'] = clientId.trim();
+    }
+    final uri = Uri.parse('$baseUrl/v1/analysis/history').replace(queryParameters: query);
     final resp = await http.get(uri);
     final parsed = _parse(resp);
     final rawItems = (parsed['items'] as List<dynamic>? ?? []);
     return rawItems
         .map((item) => Map<String, dynamic>.from(item as Map))
         .toList();
+  }
+
+  Future<Map<String, dynamic>> clearHistory({String? clientId}) async {
+    final query = <String, String>{};
+    if (clientId != null && clientId.trim().isNotEmpty) {
+      query['clientId'] = clientId.trim();
+    }
+    final uri = Uri.parse('$baseUrl/v1/analysis/history').replace(
+      queryParameters: query.isEmpty ? null : query,
+    );
+    final resp = await http.delete(uri);
+    return _parse(resp);
   }
 
   Future<ScoreWeights> getWeights() async {

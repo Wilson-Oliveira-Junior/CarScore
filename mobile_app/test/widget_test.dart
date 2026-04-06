@@ -33,8 +33,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Termometro de qualidade da compra'), findsOneWidget);
-    expect(find.text('Resumo financeiro'), findsOneWidget);
-    expect(find.textContaining('Preco pedido'), findsOneWidget);
+    expect(find.text('Score: 68 / 100'), findsOneWidget);
+    expect(find.text('Diagnostico rapido'), findsOneWidget);
+    expect(find.text('Termometro de qualidade da compra', skipOffstage: false), findsOneWidget);
+    expect(find.text('Resumo financeiro e referencia', skipOffstage: false), findsOneWidget);
+    expect(find.textContaining('Preco pedido', skipOffstage: false), findsOneWidget);
   });
 }

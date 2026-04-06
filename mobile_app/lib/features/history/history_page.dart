@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/api_client.dart';
+import '../../core/client_identity.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -9,24 +11,60 @@ class HistoryPage extends StatefulWidget {
 }
 
 class _HistoryPageState extends State<HistoryPage> {
+  static const _partsStorageKey = 'history_parts_monitor_v1';
+
   final ApiClient _api = ApiClient();
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _items = const [];
-  final List<Map<String, Object>> _parts = [
-    {
-      'name': 'Pastilha de freio dianteira',
-      'vehicle': 'Corolla 2020',
-      'price': 420.0,
-      'store': 'AutoPecas Centro',
-      'updatedAt': '30/03/2026 16:50',
-    },
-  ];
+  final List<Map<String, Object>> _parts = [];
 
   @override
   void initState() {
     super.initState();
+    _loadParts();
     _load();
+  }
+
+  Future<void> _loadParts() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getStringList(_partsStorageKey) ?? const [];
+    final parsed = <Map<String, Object>>[];
+    for (final row in saved) {
+      final fields = row.split('|');
+      if (fields.length < 5) continue;
+      final price = double.tryParse(fields[2]);
+      if (price == null) continue;
+      parsed.add({
+        'name': fields[0],
+        'vehicle': fields[1],
+        'price': price,
+        'store': fields[3],
+        'updatedAt': fields[4],
+      });
+    }
+    if (!mounted) return;
+    setState(() {
+      _parts
+        ..clear()
+        ..addAll(parsed);
+    });
+  }
+
+  Future<void> _saveParts() async {
+    final prefs = await SharedPreferences.getInstance();
+    final payload = _parts
+        .map(
+          (item) => [
+            '${item['name']}',
+            '${item['vehicle']}',
+            '${item['price']}',
+            '${item['store']}',
+            '${item['updatedAt']}',
+          ].join('|'),
+        )
+        .toList();
+    await prefs.setStringList(_partsStorageKey, payload);
   }
 
   Future<void> _addPart() async {
@@ -105,6 +143,37 @@ class _HistoryPageState extends State<HistoryPage> {
         'updatedAt': updatedAt,
       });
     });
+    await _saveParts();
+  }
+
+  Future<void> _clearHistory() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Limpar historico deste aparelho?'),
+        content: const Text('Essa acao remove apenas os registros vinculados a este dispositivo.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Limpar')),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+    try {
+      final clientId = await ClientIdentity.getOrCreateId();
+      await _api.clearHistory(clientId: clientId);
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Historico deste aparelho limpo com sucesso.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Falha ao limpar historico: $e')),
+      );
+    }
   }
 
   Widget _carsTab() {
@@ -145,10 +214,11 @@ class _HistoryPageState extends State<HistoryPage> {
       itemCount: _items.length,
       itemBuilder: (context, index) {
         final item = _items[index];
-        final label = item['label'].toString();
+        final label = (item['combinedLabel'] ?? item['label']).toString();
         final prettyLabel = label.replaceAll('_', ' ');
-        final score = item['finalScore'];
+        final score = item['combinedScore'] ?? item['finalScore'];
         final monthly = item['monthlyTotal'];
+        final partsScore = item['partsScore'];
 
         return Card(
           margin: const EdgeInsets.only(bottom: 10),
@@ -158,12 +228,32 @@ class _HistoryPageState extends State<HistoryPage> {
               foregroundColor: _labelColor(label),
               child: Text('$score'),
             ),
-            title: Text('${item['vehicleLabel']} (${item['year']})'),
-            subtitle: Text('Custo mensal: R\$ ${(monthly as num).toStringAsFixed(2)}'),
-            trailing: Chip(
-              label: Text(prettyLabel),
-              backgroundColor: _labelColor(label).withValues(alpha: 0.15),
+            title: Text(
+              '${item['vehicleLabel']} (${item['year']})',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Custo mensal: R\$ ${(monthly as num).toStringAsFixed(2)}'),
+                if (partsScore != null)
+                  Text(
+                    'Score de pecas: ${(partsScore as num).toInt()} • Score combinado: ${(score as num).toInt()}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Chip(
+                    label: Text(prettyLabel),
+                    backgroundColor: _labelColor(label).withValues(alpha: 0.15),
+                  ),
+                ),
+              ],
+            ),
+            isThreeLine: partsScore != null,
           ),
         );
       },
@@ -234,7 +324,8 @@ class _HistoryPageState extends State<HistoryPage> {
       _error = null;
     });
     try {
-      final items = await _api.history(limit: 30);
+      final clientId = await ClientIdentity.getOrCreateId();
+      final items = await _api.history(limit: 30, clientId: clientId);
       setState(() => _items = items);
     } catch (e) {
       setState(() => _error = e.toString());
@@ -264,6 +355,7 @@ class _HistoryPageState extends State<HistoryPage> {
         appBar: AppBar(
           title: const Text('Historico'),
           actions: [
+            IconButton(onPressed: _loading ? null : _clearHistory, icon: const Icon(Icons.delete_outline)),
             IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh)),
           ],
           bottom: const TabBar(

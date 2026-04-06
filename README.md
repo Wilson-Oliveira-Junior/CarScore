@@ -1,240 +1,286 @@
 ﻿# CarScore
 
-Aplicativo mobile para decisao de compra de carro usado — analise rapida, comparativo FIPE e radar de ofertas regionais integrado com marketplaces.
+Aplicativo mobile para decisao de compra de carro usado, com score de viabilidade, comparativo FIPE e radar de ofertas.
 
-## Visao do produto
-O usuario informa modelo, ano, preco pedido e perfil de uso.
-O app retorna uma leitura objetiva de viabilidade:
-- preco em relacao a referencia FIPE (tabela oficial)
-- custo mensal estimado (combustivel + manutencao)
-- score final de 0 a 100 com classificacao visual (termometro)
-- classificacao: Compra saudavel / Atencao / Nao recomendado
-- radar de ofertas reais do Mercado Livre com comparativo FIPE por regiao
+## Objetivo desta fase
 
-## Stack tecnica
-- **Mobile:** Flutter (Dart 3.x)
-- **Backend API:** Node.js + TypeScript 6 + Fastify (porta 3333)
-- **Banco de dados:** PostgreSQL (Docker)
-- **FIPE:** BrasilAPI + Parallelum/FIPE + fallback local completo (base Inmetro)
-- **Marketplace:** arquitetura de providers plugáveis (Mercado Livre + Base local), pronta para Webmotors/OLX no futuro
+Este repositorio esta sendo preparado para publicacao do app na Google Play Store.
+O foco agora e transformar o projeto em um produto publicavel, operavel em producao e em conformidade com as politicas da Play.
 
-## Estrutura do repositorio
-```
-backend-api/         API de calculo, FIPE e marketplace
-  src/
-    services/
-      fipe.ts        Integracao multi-provedor: BrasilAPI + Parallelum + fallback local
-      inmetro.ts     Base de consumo Inmetro (seed local)
-      offers/         Providers plugáveis de ofertas, agregação, filtros e fallback
-    routes/
-      vehicles.ts    Endpoints FIPE: /brands /models /years /fipe-price /consumption
-      offers.ts      Endpoint de ofertas: GET /v1/offers?region=&limit=
-    score.ts         Motor de scoring (4 pilares: preco, combustivel, manutencao, adequacao)
-    db.ts            PostgreSQL: historico + configuracao de pesos
-    server.ts        Bootstrap Fastify
+## Escopo MVP para Play Store
 
-mobile_app/          App Flutter
-  lib/
-    core/
-      api_client.dart     HTTP client + modelos: FipeBrand, MarketplaceOffer, etc.
-      app_theme.dart      Tema visual (cores, tipografia, espacamento)
-    features/
-      shell/              NavigationBar com 4 abas
-      dashboard/          Radar de oportunidades (mapa + hotspots + lista ML)
-      analysis/           Formulario de analise + tela de resultado
-      history/            Historico de analises + monitor de pecas
-      settings/           Pesos do score + perfil do usuario
+Funcionalidades que devem estar prontas para a primeira versao publica:
+- Analise de viabilidade com score final (0 a 100)
+- Analise de custo de pecas criticas (pressao de manutencao)
+- Consulta FIPE com resiliencia de fontes
+- Radar de ofertas por regiao com fallback
+- Historico de analises
+- Configuracao de pesos do score
 
-database/            Docker Compose do PostgreSQL local
-```
+## Fora de escopo do primeiro release
 
-## Funcionalidades implementadas
+Itens que podem entrar apos o lancamento inicial:
+- IA generativa para explicacoes avancadas de score
+- Login/conta de usuario
+- Alertas inteligentes por push
+- Novos providers (Webmotors/OLX em producao)
 
-## Progresso consolidado
+## Nova frente de produto: Analise de Pecas
 
-### Entregas realizadas nesta fase
-- Refatoracao completa da UX principal do app: inicio, analise, resultado, historico e configuracoes
-- Integracao FIPE com cadeia de resiliencia real: BrasilAPI -> Parallelum/FIPE -> base local
-- Integracao de ofertas regionais com arquitetura de providers plugaveis
-- Radar de oportunidades com comparativo FIPE, hotspots e origem do dado visivel na interface
-- Busca de ofertas com filtros reais no backend e no app: regiao, marca, modelo, preco, quilometragem, ano minimo e providers
-- Ranking de ofertas por qualidade com deduplicacao server-side
-- Imagens com fallback progressivo: thumbnail do anuncio -> busca externa -> icone local
-- Melhorias de navegacao e pre-preenchimento entre busca FIPE, analise e resultado
-- Ajustes de estabilidade do backend, cache em memoria e fallbacks operacionais
+Problema:
+- Um carro pode ter bom score geral e ainda gerar alto custo real de uso por causa de pecas caras.
 
-### Validado localmente
-- Build do backend TypeScript concluido com sucesso
-- `dart analyze lib/` sem issues
-- Endpoint de busca FIPE respondendo com `source`, `sourceName` e `isFallback`
-- Endpoint de ofertas respondendo com filtros por marca/modelo/preco/km/ano/providers
-- Endpoint de saude dos providers de ofertas respondendo com status e fallback
-- Ranking com `qualityScore` retornando na busca de ofertas
-- Fallback de ofertas validado com `Toyota Corolla`, preco maximo e km maximo
-- Banco PostgreSQL local iniciado via Docker Compose
+Objetivo:
+- Adicionar um modulo de analise de pecas para complementar o score atual de compra.
 
-### Tela Inicio — Radar de Oportunidades
-- **Integracao real com Mercado Livre:** busca veiculos usados por cidade/estado via API publica MLB
-- **Comparativo FIPE automatico:** cada oferta exibe preco pedido vs. estimativa FIPE + diferenca em R$
-- **Hotspots no mapa:** bolhas coloridas posicionadas sobre mapa estilo cartografia (verde = abaixo da FIPE, vermelho = acima)
-- **Badge de fonte:** label "Mercado Livre" (azul) ou "Base local" (cinza) em cada oferta
-- **Fallback robusto:** quando ML esta fora do ar, exibe dados semeados (15 ofertas de grandes cidades)
-- **Thumbnail do anuncio:** imagem real do anuncio ML; fallback via Unsplash por marca+modelo
-- **Botao "Ver anuncio":** abre o link do ML diretamente (url_launcher)
-- **Botao "Analisar":** atalho para busca FIPE pre-preenchida
-- **Pull-to-refresh e botao de atualizar**
-- **Campo de regiao** com busca ao pressionar Enter
-- **Filtros reais de busca:** marca, modelo, preco maximo, quilometragem maxima, ano minimo e selecao de providers
-- **Ranking de qualidade:** ordenacao por `qualityScore` com deduplicacao de anuncios semelhantes
-- **Indicador global de modo fallback:** banner no topo informando operacao normal/degradada
-- **Persistencia local de filtros recentes:** chips de buscas recentes com reaplicacao rapida
-- **Loading premium:** skeleton com animacao leve e transicao suave para o conteudo
+Resultado esperado para o usuario:
+- Ver o risco de manutencao por pecas antes de comprar.
+- Entender impacto mensal estimado de troca de itens comuns.
+- Comparar dois carros tambem pelo custo de pecas.
 
-### Tela Analise — Formulario detalhado
-- Banner hero com imagem do veiculo (Unsplash)
-- Dica contextual sobre consulta FIPE anterior
-- Campos com icones: modelo, ano, preco, km/mes, combustivel, litro preco, manutencao
-- Botao adaptativo ("Gerar score detalhado" se vier de busca FIPE, "Analisar agora" senao)
+### MVP de Pecas (primeira versao)
 
-### Tela Resultado — Score detalhado
-- **Termometro visual** (degradê vermelho → laranja → verde) com marcador animado
-- Imagem do veiculo (Unsplash por modelo)
-- **Resumo financeiro:** preco pedido, ref. FIPE, km/l, tipo de combustivel, custo mensal
-- Barras de progresso por pilar (preco, combustivel, manutencao, adequacao)
-- Rodape com pesos usados e timestamp da analise
+Entradas:
+- Marca, modelo, ano, motorizacao (quando disponivel), regiao
+- Quilometragem atual
+- Perfil de uso (urbano, misto, rodoviario)
 
-### Tela Busca de Veiculo (FIPE)
-- Cascata: Marca → Modelo → Ano → Preco FIPE + Consumo Inmetro
-- Exibe claramente a origem do valor FIPE: BrasilAPI, Parallelum/FIPE ou Base local
-- Preview da imagem do veiculo ao selecionar o modelo
-- Passa dados pre-preenchidos para o formulario de analise
+Saidas:
+- Score de pecas (0 a 100)
+- Cesta de pecas criticas com preco minimo, medio e maximo
+- Custo anual estimado de manutencao por pecas de desgaste
+- Alerta de pecas fora da curva (muito acima da media da categoria)
 
-### Tela Historico
-- Aba "Carros": historico real da API (PostgreSQL)
-- Aba "Pecas": monitor de pecas com botao "Adicionar" (dialog)
+Pecas iniciais recomendadas:
+- Jogo de freio
+- Kit embreagem
+- Amortecedores
+- Pneu
+- Bateria
+- Bomba de combustivel
+- Correia e tensor
 
-### Tela Configuracoes
-- Sliders de pesos por pilar com explicacao de cada criterio
-- Perfil do usuario: cidade, orcamento-alvo, preco do litro, preferencias (switches)
+### Modelo de calculo inicial (simples e explicavel)
 
-## Resiliencia das APIs
+- Criar indice de pressao de pecas (IPP):
+	IPP = custo_cesta_pecas_12m / renda_mensal_referencia
+- Converter IPP para score de pecas:
+	- IPP baixo = score alto
+	- IPP alto = score baixo
+- Combinar com score atual do carro:
+	score_final_compra = (score_carro x peso_carro) + (score_pecas x peso_pecas)
 
-| Servico | Primario | Fallback 1 | Fallback 2 |
-|---|---|---|---|
-| FIPE marcas/modelos/anos/preco | BrasilAPI | Parallelum/FIPE | Base Inmetro local |
-| Ofertas regionais | Provider Mercado Livre | Provider Base local | Proximos providers: Webmotors/OLX |
-| Imagens de veiculos | Thumbnail ML (foto real) | Wikipedia PageImages (por modelo) | Icone padrao |
+Pesos iniciais sugeridos:
+- peso_carro: 0.7
+- peso_pecas: 0.3
 
-O cache em memoria do backend (10 min TTL) reduz chamadas externas e protege contra instabilidade.
+### O que precisa ser implementado
 
-## Endpoints da API
+Backend:
+- Novo servico de pecas em backend-api/src/services/parts/ (concluido - v1 local)
+- Tabela de referencia local de precos por peca/marca/modelo (concluido - seed local v1)
+- Endpoint para cotacao de pecas e endpoint para score de pecas (concluido)
+- Persistir historico da analise de pecas junto da analise de carro (concluido)
 
-```
-GET  /health
-POST /v1/analysis/estimate
-GET  /v1/analysis/history?limit=
-GET  /v1/config/weights
-PUT  /v1/config/weights
-GET  /v1/vehicles/brands
-GET  /v1/vehicles/models?brandCode=
-GET  /v1/vehicles/years?brandCode=&modelCode=
-GET  /v1/vehicles/fipe-price?brandCode=&modelCode=&yearCode=
-GET  /v1/vehicles/consumption?brand=&model=&year=
-GET  /v1/offers?region=&brand=&model=&minPrice=&maxPrice=&maxKm=&minYear=&providers=&limit=
-GET  /v1/offers/providers/health
-```
+Mobile:
+- Nova secao na tela de resultado com score de pecas (concluido)
+- Nova tela de detalhe de pecas com comparativo por faixa de preco (concluido)
+- Opcao de incluir renda mensal para personalizar risco (concluido)
+- Atualizar historico para exibir score combinado (concluido)
+- Indicador de confianca da cotacao de pecas (concluido)
 
-## Como rodar localmente
+Dados e resiliencia:
+- Fonte primaria: provedor externo (Mercado Livre)
+- Fonte secundaria: base local versionada no repositorio
+- Fallback: mediana por categoria de veiculo
 
-### 1) Requisitos
-- Node.js 20+ e npm 10+
-- Docker Desktop
-- Flutter SDK 3.x
+### Endpoints novos propostos
 
-### 2) Banco de dados
+- GET /v1/parts/catalog?brand=&model=&year=
+- POST /v1/parts/estimate
+- POST /v1/analysis/estimate-with-parts
+
+Status atual dos endpoints de pecas:
+- GET /v1/parts/catalog (implementado)
+- POST /v1/parts/estimate (implementado)
+- POST /v1/analysis/estimate-with-parts (implementado)
+- Integracao externa de precos com Mercado Livre + fallback local (implementado)
+- Protecao de IPP com renda de referencia por regiao e minimo de seguranca (implementado)
+
+### Criterio de pronto do modulo de pecas
+
+- Score de pecas disponivel na API e no app
+- Resultado final mostrando score carro, score pecas e score combinado
+- Historico salvo com rastreabilidade da cesta usada no calculo
+- Testes cobrindo calculo, fallback e validacao de payload
+
+## Arquitetura alvo para producao
+
+- Mobile: Flutter (Android release)
+- Backend: Node.js + TypeScript + Fastify
+- Banco: PostgreSQL gerenciado
+- Integracoes externas: BrasilAPI, Parallelum/FIPE, Mercado Livre
+
+Importante:
+- O app publicado nao pode depender de localhost.
+- Toda API deve estar hospedada com HTTPS valido.
+- Fallbacks devem continuar ativos para degradacao controlada.
+
+## Plano de publicacao na Play Store
+
+## Mudancas obrigatorias no projeto para Play Store
+
+Aplicativo Android:
+- Remover qualquer dependencia de localhost no app
+- Implementar configuracao de ambientes (dev, staging, prod)
+- Garantir assinatura de release e controle de versao Android
+- Revisar permissoes e manter apenas o necessario
+
+Backend e infraestrutura:
+- Publicar API em dominio HTTPS estavel
+- Configurar banco gerenciado com backup e restauracao testada
+- Adicionar rate limit, timeout e observabilidade minima
+- Definir estrategia de segredo e rotacao de chaves
+
+Qualidade:
+- Suite minima de testes de regressao para API critica
+- Teste em Android fisico para fluxo completo
+- Plano de degradacao quando FIPE/ofertas estiverem indisponiveis
+
+Play Console e compliance:
+- Politica de privacidade publica e consistente com o app
+- Preenchimento correto de Data Safety
+- Classificacao indicativa e conteudo da ficha da loja
+- Materiais obrigatorios: icone, screenshots e feature graphic
+
+Operacao apos lancamento:
+- Definir monitoramento de erros e tempo de resposta
+- Definir canal de suporte e SLA basico de resposta
+- Planejar trilha interna e depois trilha de producao
+
+## Fase 1 - Produto e compliance
+
+Checklist:
+- Definir versao de release (MVP fechado)
+- Revisar textos de loja (titulo, descricao curta, descricao completa)
+- Criar politica de privacidade publica (URL)
+- Preparar formulario Data Safety da Play Console
+- Validar tratamento de dados pessoais (coleta, uso, retencao)
+- Definir email de suporte e canal de contato
+
+Criterio de saida:
+- Documentacao legal pronta e requisitos de loja definidos.
+
+## Fase 2 - Backend em producao
+
+Checklist:
+- Subir backend em ambiente publico (staging e prod)
+- Provisionar PostgreSQL gerenciado com backup
+- Configurar variaveis de ambiente seguras
+- Habilitar CORS para dominios autorizados
+- Adicionar rate limiting e timeouts
+- Configurar logs estruturados e monitoramento basico
+- Publicar endpoint de health para monitoracao
+
+Criterio de saida:
+- API estavel em HTTPS com observabilidade minima.
+
+## Fase 3 - App Flutter para release Android
+
+Checklist:
+- Criar configuracao de ambientes (dev, staging, prod)
+- Apontar app para API de producao (sem localhost)
+- Revisar permissoes Android (somente necessarias)
+- Configurar assinatura com keystore
+- Gerar app bundle (.aab)
+- Ajustar versionCode e versionName
+- Validar integracoes externas em dispositivo real
+
+Criterio de saida:
+- Build release assinado, instalavel e estavel.
+
+## Fase 4 - Qualidade pre-publicacao
+
+Checklist:
+- Teste funcional ponta a ponta em Android real
+- Teste de degradacao (FIPE/offers indisponiveis)
+- Teste de latencia e timeout de API
+- Revisao de UX para estados de erro e vazio
+- Revisao de crash logs
+
+Criterio de saida:
+- Sem bloqueadores para submissao.
+
+## Fase 5 - Play Console e lancamento
+
+Checklist:
+- Criar app na Play Console
+- Enviar .aab assinado
+- Preencher Data Safety e classificacao indicativa
+- Subir icone, feature graphic e screenshots
+- Publicar em trilha interna/fechada primeiro
+- Coletar feedback e corrigir antes da producao
+
+Criterio de saida:
+- App aprovado e publicado na trilha desejada.
+
+## Status atual resumido
+
+Ja existe base funcional forte para o MVP:
+- Backend com endpoints de analise, FIPE, ofertas e configuracoes
+- App Flutter com dashboard, analise, resultado, historico e settings
+- Fallbacks para fontes externas e cache de resiliencia
+
+Principais gaps para publicacao:
+- Formalizacao de compliance (politica e Data Safety)
+- Infraestrutura de producao consolidada
+- Pipeline de release Android (assinatura e AAB)
+- Bateria de testes em dispositivo real com foco em falhas externas
+- Checklist final de ambientes (staging/prod) e build release com `--dart-define` (guia e script prontos)
+
+## Comandos uteis (ambiente local)
+
+Banco:
+
 ```powershell
 cd database
 docker compose up -d
 ```
 
-### 3) Backend
+Backend:
+
 ```powershell
 cd backend-api
 npm install
 npm run dev
 ```
 
-### 4) App Flutter (Chrome)
+Mobile:
+
 ```powershell
 cd mobile_app
 flutter pub get
-flutter run -d chrome
+flutter run -d android
 ```
 
-### Testes
-```powershell
-# Backend
-cd backend-api ; npm test
+Release Play Store (guia e automacao):
+- mobile_app/PLAYSTORE_RELEASE.md
+- mobile_app/scripts/build-android-release.ps1
 
-# Mobile
-cd mobile_app ; flutter test
-```
+## Limpeza basica concluida
 
-## Score — 4 pilares
+- Removido arquivo legado sem uso da UI mobile (`features/home/home_page.dart`).
+- Historico de analises agora pode ser filtrado por identificador do dispositivo (clientId), evitando mistura de registros de testes antigos.
+- Aba de pecas no historico nao inicia mais com dado mock fixo; passa a listar apenas itens adicionados pelo usuario no aparelho.
+- Cards do dashboard ajustados para telas menores para evitar overflow horizontal.
 
-| Pilar | O que avalia |
-|---|---|
-| Preco | Distancia do preco pedido em relacao a tabela FIPE |
-| Combustivel | Custo mensal estimado (km/mes ÷ km/l × preco litro) |
-| Manutencao | Custo fixo mensal com manutencao informado |
-| Adequacao | Relacao custo-beneficio dado o perfil de uso |
+## Estado atual do produto
 
-Pesos configuráveis pelo usuario na aba Configuracoes (padrao: 25% cada).
+- Dados de ofertas podem vir de fonte externa (Mercado Livre) com fallback controlado para base local quando necessario.
+- Analise com score de carro + score de pecas + score combinado ativa no backend e no mobile.
+- Build debug Android validado e gerado localmente em `mobile_app/build/app/outputs/flutter-apk/app-debug.apk`.
 
-## Historico de evolucao
+## Proximo passo recomendado
 
-- **2026-03-26:** planejamento e bootstrap tecnico (backend, banco, estrutura)
-- **2026-03-30:** pipeline CI (GitHub Actions), Flutter configurado
-- **2026-03-30:** redesign completo de todas as 5 telas (UX, termometro, comparativos)
-- **2026-03-30:** integracao FIPE com fallback local completo (BrasilAPI + Inmetro)
-- **2026-03-30:** integracao FIPE multi-provedor com Parallelum/FIPE como fonte secundaria
-- **2026-03-30:** integracao Mercado Livre com fallback semeado para 15 ofertas / 10 cidades
-- **2026-03-30:** mapa de hotspots com dados reais, badge de fonte, link direto ao anuncio
-- **2026-03-30:** arquitetura de offers providers preparada para futuras fontes como Webmotors e OLX
-- **2026-03-30:** filtros server-side e client-side para marca, modelo, preco e quilometragem
-- **2026-03-31:** dashboard com selecao de providers e filtro de ano minimo
-- **2026-03-31:** endpoint de saude dos providers e ranking por `qualityScore`
-- **2026-03-31:** indicador global de fallback no topo do dashboard
-- **2026-03-31:** persistencia local de filtros recentes no dashboard
-- **2026-03-31:** skeleton animado e transicao suave entre carregamento e conteudo
-- **2026-03-31:** imagens corrigidas com Wikipedia PageImages API: foto coerente com modelo (15/15 validados)
-
-## Status do roadmap
-
-### Curto prazo
-1. Adicionar selecao de providers e filtro de ano minimo na interface do dashboard: **Concluido**
-2. Criar endpoint de saude dos providers para a UI indicar quando esta em fallback: **Concluido (backend + indicador visual no dashboard)**
-3. Melhorar deduplicacao e ranqueamento das ofertas por relevancia e qualidade do anuncio: **Concluido (qualityScore + dedupe no backend)**
-
-### Medio prazo
-1. Implementar novos providers reais assim que houver fonte estavel ou parceria viavel: **Parcial (stubs Webmotors/OLX prontos)**
-2. Salvar buscas, filtros e alertas por usuario para monitoramento continuo de oportunidades: **Parcial (filtros recentes locais concluidos; alertas e conta de usuario pendentes)**
-3. Evoluir o comparativo financeiro com custo total de posse e projecao anual: **Pendente**
-
-### Longo prazo
-1. Transformar o CarScore em referencia de decisao de compra com monitoramento continuo do mercado: **Em andamento (base pronta)**
-2. Adicionar experiencia mobile completa em Android/iOS com notificacoes e favoritos: **Pendente**
-3. Integrar mais fontes de dados veiculares, historico, manutencao e revenda: **Parcial (arquitetura plugavel pronta)**
-
-## Proximos passos atualizados
-
-### Prioridade imediata
-1. Ajustar pesos do `qualityScore` com base em testes reais de mercado
-2. Evoluir persistencia local para persistencia por usuario (com alertas)
-3. Exibir explicacao de score de oportunidade por card (por que esta bom/ruim)
-
-## Observacoes
-- Valores de FIPE podem vir de BrasilAPI, Parallelum/FIPE ou base local; o app agora mostra a origem do dado ao usuario.
-- Preco, consumo e manutencao podem variar por regiao, versao e condicao do veiculo.
-- Android e Windows desktop requerem, respectivamente, Android SDK e Visual Studio C++ toolchain.
-
+- Publicar backend em HTTPS (staging/prod) e trocar `API_BASE_URL` de release para endpoint publico.
+- Gerar AAB assinado para submissao na Play Console.

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/api_client.dart';
+import '../../core/client_identity.dart';
 import 'result_page.dart';
 import 'vehicle_search_page.dart';
 
@@ -29,6 +31,9 @@ class AnalysisPage extends StatefulWidget {
 }
 
 class _AnalysisPageState extends State<AnalysisPage> {
+  static const _kCombinedCarWeight = 'combined_car_weight';
+  static const _kCombinedPartsWeight = 'combined_parts_weight';
+
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _vehicleCtrl;
   late final TextEditingController _yearCtrl;
@@ -37,11 +42,17 @@ class _AnalysisPageState extends State<AnalysisPage> {
   late final TextEditingController _kmLiterCtrl;
   final _fuelPriceCtrl = TextEditingController(text: '5.50');
   final _maintenanceCtrl = TextEditingController(text: '100');
+  final _regionCtrl = TextEditingController(text: 'Sao Paulo');
+  final _odometerCtrl = TextEditingController(text: '60000');
+  final _incomeCtrl = TextEditingController(text: '6000');
 
   final ApiClient _api = ApiClient();
 
   double? _fipeReferencePrice;
   String? _fuelType;
+  String _usageProfile = 'mixed';
+  double _combinedCarWeight = 0.7;
+  double _combinedPartsWeight = 0.3;
   bool _loading = false;
 
   @override
@@ -54,6 +65,18 @@ class _AnalysisPageState extends State<AnalysisPage> {
         TextEditingController(text: (p?.suggestedKmPerLiter ?? 10.0).toStringAsFixed(1));
     _fipeReferencePrice = p?.fipeReferencePrice;
     _fuelType = p?.fuelType;
+    _loadCombinedWeights();
+  }
+
+  Future<void> _loadCombinedWeights() async {
+    final prefs = await SharedPreferences.getInstance();
+    final car = prefs.getDouble(_kCombinedCarWeight);
+    final parts = prefs.getDouble(_kCombinedPartsWeight);
+    if (!mounted) return;
+    setState(() {
+      if (car != null) _combinedCarWeight = car;
+      if (parts != null) _combinedPartsWeight = parts;
+    });
   }
 
   @override
@@ -65,7 +88,26 @@ class _AnalysisPageState extends State<AnalysisPage> {
     _kmLiterCtrl.dispose();
     _fuelPriceCtrl.dispose();
     _maintenanceCtrl.dispose();
+    _regionCtrl.dispose();
+    _odometerCtrl.dispose();
+    _incomeCtrl.dispose();
     super.dispose();
+  }
+
+  ({String brand, String model}) _extractBrandModel(String rawLabel) {
+    final words = rawLabel
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((item) => item.isNotEmpty)
+        .toList();
+
+    if (words.isEmpty) {
+      return (brand: 'Generica', model: 'Modelo');
+    }
+    if (words.length == 1) {
+      return (brand: words.first, model: words.first);
+    }
+    return (brand: words.first, model: words.sublist(1).join(' '));
   }
 
   String _vehicleImageUrl(String label) {
@@ -94,7 +136,31 @@ class _AnalysisPageState extends State<AnalysisPage> {
         if (_fipeReferencePrice != null) 'fipeReferencePrice': _fipeReferencePrice,
       };
 
-      final res = await _api.estimate(payload);
+      final vehicle = _extractBrandModel(_vehicleCtrl.text.trim());
+      final partsPayload = <String, dynamic>{
+        'brand': vehicle.brand,
+        'model': vehicle.model,
+        'year': int.parse(_yearCtrl.text),
+        'region': _regionCtrl.text.trim().isEmpty ? 'nacional' : _regionCtrl.text.trim(),
+        'odometerKm': double.parse(_odometerCtrl.text.replaceAll(',', '.')),
+        'usageProfile': _usageProfile,
+        'monthlyIncomeReference': double.parse(_incomeCtrl.text.replaceAll(',', '.')),
+      };
+
+      final weightSum = _combinedCarWeight + _combinedPartsWeight;
+      final normalizedWeights = weightSum > 0
+          ? {
+              'car': _combinedCarWeight / weightSum,
+              'parts': _combinedPartsWeight / weightSum,
+            }
+          : const {'car': 0.7, 'parts': 0.3};
+
+      final res = await _api.estimateWithParts(
+        analysis: payload,
+        parts: partsPayload,
+        clientId: await ClientIdentity.getOrCreateId(),
+        weights: normalizedWeights,
+      );
       final result = Map<String, dynamic>.from(res['result'] as Map);
 
       if (!mounted) return;
@@ -351,6 +417,61 @@ class _AnalysisPageState extends State<AnalysisPage> {
                 validator: (v) => (v == null || double.tryParse(v.replaceAll(',', '.')) == null)
                     ? 'Valor invalido'
                     : null,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Analise de pecas',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _regionCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Regiao',
+                  prefixIcon: Icon(Icons.map_outlined),
+                ),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Informe a regiao' : null,
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _odometerCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Quilometragem atual (km)',
+                  prefixIcon: Icon(Icons.speed_outlined),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                validator: (v) => (v == null || double.tryParse(v.replaceAll(',', '.')) == null)
+                    ? 'Valor invalido'
+                    : null,
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _incomeCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Renda mensal de referencia (R\$)',
+                  prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                validator: (v) => (v == null || double.tryParse(v.replaceAll(',', '.')) == null)
+                    ? 'Valor invalido'
+                    : null,
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                initialValue: _usageProfile,
+                decoration: const InputDecoration(
+                  labelText: 'Perfil de uso',
+                  prefixIcon: Icon(Icons.alt_route_outlined),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'urban', child: Text('Urbano')),
+                  DropdownMenuItem(value: 'mixed', child: Text('Misto')),
+                  DropdownMenuItem(value: 'highway', child: Text('Rodoviario')),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() => _usageProfile = value);
+                },
               ),
               const SizedBox(height: 20),
               FilledButton(

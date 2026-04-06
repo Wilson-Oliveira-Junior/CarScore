@@ -2,10 +2,11 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
 import { analyze } from './score';
-import { getAnalysisHistory, getWeights, initDb, insertAnalysis, updateWeights } from './db';
+import { clearAnalysisHistory, getAnalysisHistory, getWeights, initDb, insertAnalysis, updateWeights } from './db';
 import { AnalysisInputSchema, WeightsUpdateSchema } from './contracts';
 import { vehicleRoutes } from './routes/vehicles';
 import { offersRoutes } from './routes/offers';
+import { partsRoutes } from './routes/parts';
 
 const app = Fastify({ logger: true });
 
@@ -18,13 +19,16 @@ async function buildServer() {
 
   await app.register(vehicleRoutes);
   await app.register(offersRoutes);
+  await app.register(partsRoutes);
 
   app.get('/health', async () => {
     return { status: 'ok', service: 'carscore-api' };
   });
 
   app.post('/v1/analysis/estimate', async (request, reply) => {
-    const parsed = AnalysisInputSchema.safeParse(request.body);
+    const parsed = AnalysisInputSchema.extend({
+      clientId: z.string().min(8).max(120).optional(),
+    }).safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({
         error: 'invalid_payload',
@@ -35,7 +39,11 @@ async function buildServer() {
     const data = parsed.data;
     const weights = await getWeights();
     const result = analyze(data, weights);
-    const analysisId = await insertAnalysis({ input: data, result });
+    const analysisId = await insertAnalysis({
+      clientId: data.clientId,
+      input: data,
+      result,
+    });
 
     return {
       input: data,
@@ -49,16 +57,27 @@ async function buildServer() {
   app.get('/v1/analysis/history', async (request) => {
     const querySchema = z.object({
       limit: z.coerce.number().int().min(1).max(100).optional(),
+      clientId: z.string().min(8).max(120).optional(),
     });
 
     const parsed = querySchema.safeParse(request.query);
     const limit = parsed.success ? parsed.data.limit ?? 20 : 20;
-    const history = await getAnalysisHistory(limit);
+    const clientId = parsed.success ? parsed.data.clientId : undefined;
+    const history = await getAnalysisHistory(limit, clientId);
 
     return {
       items: history,
       count: history.length,
     };
+  });
+
+  app.delete('/v1/analysis/history', async (request) => {
+    const querySchema = z.object({
+      clientId: z.string().min(8).max(120).optional(),
+    });
+    const parsed = querySchema.safeParse(request.query);
+    const removed = await clearAnalysisHistory(parsed.success ? parsed.data.clientId : undefined);
+    return { ok: true, deleted: removed };
   });
 
   app.get('/v1/config/weights', async () => {

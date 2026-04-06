@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/api_client.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -9,12 +10,23 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  static const _kCombinedCarWeight = 'combined_car_weight';
+  static const _kCombinedPartsWeight = 'combined_parts_weight';
+  static const _kProfileCity = 'profile_city';
+  static const _kProfileBudget = 'profile_budget';
+  static const _kProfileFuel = 'profile_fuel';
+  static const _kNotifyDrops = 'profile_notify_drops';
+  static const _kPreferEconomy = 'profile_prefer_economy';
+  static const _kIncludePartsHistory = 'profile_include_parts_history';
+
   final ApiClient _api = ApiClient();
 
   double _price = 0.40;
   double _fuel = 0.25;
   double _maintenance = 0.20;
   double _adequacy = 0.15;
+  double _carWeight = 0.70;
+  double _partsWeight = 0.30;
 
   bool _loading = true;
   bool _saving = false;
@@ -43,8 +55,53 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _saveProfilePrefs() {
+    _saveProfilePrefsAsync();
+  }
+
+  Future<void> _saveProfilePrefsAsync() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kProfileCity, _cityCtrl.text.trim());
+      await prefs.setString(_kProfileBudget, _budgetCtrl.text.trim());
+      await prefs.setString(_kProfileFuel, _fuelCtrl.text.trim());
+      await prefs.setBool(_kNotifyDrops, _notifyDrops);
+      await prefs.setBool(_kPreferEconomy, _preferEconomy);
+      await prefs.setBool(_kIncludePartsHistory, _includePartsInHistory);
+      await prefs.setDouble(_kCombinedCarWeight, _carWeight);
+      await prefs.setDouble(_kCombinedPartsWeight, _partsWeight);
+      if (!mounted) return;
+      setState(() {
+        _message = 'Preferencias salvas com sucesso.';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _message = 'Erro ao salvar preferencias: $e';
+      });
+    }
+  }
+
+  Future<void> _loadProfilePrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final city = prefs.getString(_kProfileCity);
+    final budget = prefs.getString(_kProfileBudget);
+    final fuel = prefs.getString(_kProfileFuel);
+    final notifyDrops = prefs.getBool(_kNotifyDrops);
+    final preferEconomy = prefs.getBool(_kPreferEconomy);
+    final includePartsHistory = prefs.getBool(_kIncludePartsHistory);
+    final carWeight = prefs.getDouble(_kCombinedCarWeight);
+    final partsWeight = prefs.getDouble(_kCombinedPartsWeight);
+
+    if (!mounted) return;
     setState(() {
-      _message = 'Preferencias salvas localmente para esta sessao.';
+      if (city != null && city.isNotEmpty) _cityCtrl.text = city;
+      if (budget != null && budget.isNotEmpty) _budgetCtrl.text = budget;
+      if (fuel != null && fuel.isNotEmpty) _fuelCtrl.text = fuel;
+      if (notifyDrops != null) _notifyDrops = notifyDrops;
+      if (preferEconomy != null) _preferEconomy = preferEconomy;
+      if (includePartsHistory != null) _includePartsInHistory = includePartsHistory;
+      if (carWeight != null) _carWeight = carWeight;
+      if (partsWeight != null) _partsWeight = partsWeight;
     });
   }
 
@@ -54,6 +111,7 @@ class _SettingsPageState extends State<SettingsPage> {
       _message = null;
     });
     try {
+      await _loadProfilePrefs();
       final w = await _api.getWeights();
       setState(() {
         _price = w['price']!;
@@ -123,6 +181,7 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final sum = _price + _fuel + _maintenance + _adequacy;
+    final combinedSum = _carWeight + _partsWeight;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Configurações')),
@@ -165,6 +224,29 @@ class _SettingsPageState extends State<SettingsPage> {
                         ),
                         const SizedBox(height: 8),
                         Text('Soma atual: ${sum.toStringAsFixed(2)}'),
+                        const SizedBox(height: 12),
+                        const Divider(),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Peso do termometro final (carro + pecas)',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 8),
+                        _weightSlider(
+                          label: 'Peso do score do carro',
+                          value: _carWeight,
+                          onChanged: (v) => setState(() => _carWeight = v),
+                        ),
+                        _weightSlider(
+                          label: 'Peso do score de pecas',
+                          value: _partsWeight,
+                          onChanged: (v) => setState(() => _partsWeight = v),
+                        ),
+                        Text('Soma atual (carro+pecas): ${combinedSum.toStringAsFixed(2)}'),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Esses pesos sao enviados na analise combinada e mudam o termometro de compra.',
+                        ),
                         const SizedBox(height: 6),
                         const Text(
                           'Dica: mantenha Preco alto se a negociacao for prioridade. Aumente Combustivel e Manutencao se foco for custo mensal.',

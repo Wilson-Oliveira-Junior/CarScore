@@ -1405,21 +1405,23 @@ class _DashboardPageState extends State<DashboardPage>
                         if (offer.km > 0) '${_money(offer.km)} km',
                         if (offer.year > 0) offer.year.toString(),
                       ].join(' • '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                           fontSize: 11, color: Colors.grey[600]),
                     ),
                     const SizedBox(height: 4),
-                    Row(
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
                       children: [
                         _miniTag(offer.sourceName,
                             offer.source == 'mercadolivre'
                                 ? const Color(0xFF3483FA)
                                 : const Color(0xFF6E7E85)),
-                        const SizedBox(width: 4),
                         _miniTag(
                             _dealLabel(offer),
                             color),
-                        const SizedBox(width: 4),
                         _miniTag(
                           '${offer.qualityScore}/100',
                           const Color(0xFF124E78),
@@ -1431,11 +1433,15 @@ class _DashboardPageState extends State<DashboardPage>
               ),
               const SizedBox(width: 8),
               // Preco
-              Column(
+              SizedBox(
+                width: 96,
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
                     _money(offer.price),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                         fontWeight: FontWeight.w800,
                         color: color,
@@ -1454,10 +1460,13 @@ class _DashboardPageState extends State<DashboardPage>
                   const SizedBox(height: 2),
                   Text(
                     'FIPE ${_money(offer.fipeEstimate)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                         fontSize: 10, color: Colors.grey[500]),
                   ),
                 ],
+                ),
               ),
             ],
           ),

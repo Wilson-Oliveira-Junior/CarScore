@@ -116,12 +116,25 @@ Retorna as últimas análises salvas.
       "askingPrice": 72000,
       "finalScore": 66,
       "label": "viavel_com_atencao",
-      "monthlyTotal": 785.60
+      "monthlyTotal": 785.60,
+      "partsScore": 74,
+      "partsLabel": "baixo_risco_pecas",
+      "partsAnnualCost": 3200.5,
+      "partsMonthlyCost": 266.71,
+      "combinedScore": 70,
+      "combinedLabel": "viavel_com_atencao",
+      "combinedWeights": {
+        "car": 0.7,
+        "parts": 0.3
+      }
     }
   ],
   "count": 1
 }
 ```
+
+Observacao:
+- Os campos de pecas e combinado sao opcionais e aparecem quando o registro foi criado por `POST /v1/analysis/estimate-with-parts`.
 
 ---
 
@@ -180,6 +193,161 @@ Atualiza os pesos do score. Os valores são normalizados automaticamente (soma s
 
 ---
 
+## GET /v1/parts/catalog
+
+Retorna a cesta base de pecas com estimativas min/media/max para um veiculo.
+
+**Query params**
+
+| Param      | Tipo   | Obrig. | Descricao |
+|------------|--------|--------|-----------|
+| brand      | string | sim    | Marca (ex.: Honda) |
+| model      | string | sim    | Modelo (ex.: Civic) |
+| year       | number | sim    | Ano do veiculo |
+| region     | string | nao    | Regiao para ajuste de preco |
+| odometerKm | number | nao    | Quilometragem atual |
+| usageProfile | string | nao  | `urban`, `mixed` ou `highway` |
+
+**Response 200**
+```json
+{
+  "input": {
+    "brand": "Honda",
+    "model": "Civic",
+    "year": 2019,
+    "region": "nacional",
+    "odometerKm": 60000,
+    "usageProfile": "mixed"
+  },
+  "items": [
+    {
+      "key": "brake_kit",
+      "label": "Jogo de freio",
+      "minPrice": 350,
+      "avgPrice": 520,
+      "maxPrice": 760,
+      "annualCostEstimate": 260
+    }
+  ],
+  "count": 7,
+  "source": "local_seed_v1"
+}
+```
+
+---
+
+## POST /v1/parts/estimate
+
+Calcula risco de manutencao por pecas, com score e indice IPP.
+
+**Request body**
+
+| Campo                  | Tipo   | Obrig. | Descricao |
+|------------------------|--------|--------|-----------|
+| brand                  | string | sim    | Marca |
+| model                  | string | sim    | Modelo |
+| year                   | number | sim    | Ano |
+| region                 | string | nao    | Regiao |
+| odometerKm             | number | nao    | Quilometragem atual |
+| usageProfile           | string | nao    | `urban`, `mixed`, `highway` |
+| monthlyIncomeReference | number | nao    | Renda mensal de referencia (padrao regional, minimo 3000) |
+
+**Response 200**
+```json
+{
+  "result": {
+    "input": {
+      "brand": "Honda",
+      "model": "Civic",
+      "year": 2019,
+      "region": "nacional",
+      "odometerKm": 60000,
+      "usageProfile": "mixed",
+      "monthlyIncomeReference": 5000
+    },
+    "basket": [],
+    "annualPartsCost": 3200.5,
+    "monthlyPartsCost": 266.71,
+    "ipp": 0.64,
+    "partsScore": 84,
+    "label": "baixo_risco_pecas",
+    "outlierParts": ["Pneu (jogo)"],
+    "source": "mercadolivre_blended_v1",
+    "sourceDetails": {
+      "provider": "mercadolivre",
+      "marketQuotesUsed": 62,
+      "fallbackUsed": false
+    }
+  }
+}
+```
+
+Comportamento de fonte:
+- Primario: Mercado Livre (cotacao externa por peca)
+- Fallback: base local `local_seed_v1` quando houver poucas cotacoes validas ou falha de rede
+
+Protecao do IPP:
+- Quando a renda nao e informada, o backend usa renda de referencia por regiao e minimo de 3000 para evitar distorcoes extremas no score.
+
+---
+
+## POST /v1/analysis/estimate-with-parts
+
+Executa analise completa do carro + pecas e retorna score combinado.
+
+**Request body**
+```json
+{
+  "analysis": {
+    "vehicleLabel": "Honda Civic 2019",
+    "year": 2019,
+    "askingPrice": 82000,
+    "kmPerMonth": 1200,
+    "kmPerLiter": 12.5,
+    "fuelPricePerLiter": 6.2,
+    "maintenanceMonthly": 220
+  },
+  "parts": {
+    "brand": "Honda",
+    "model": "Civic",
+    "year": 2019,
+    "usageProfile": "mixed",
+    "monthlyIncomeReference": 7000
+  },
+  "weights": {
+    "car": 0.7,
+    "parts": 0.3
+  }
+}
+```
+
+**Response 200**
+```json
+{
+  "input": { "analysis": {}, "parts": {}, "weights": {} },
+  "result": {
+    "car": { "finalScore": 68, "label": "viavel_com_atencao" },
+    "parts": { "partsScore": 74, "label": "baixo_risco_pecas" },
+    "combined": {
+      "score": 70,
+      "label": "viavel_com_atencao",
+      "weights": { "car": 0.7, "parts": 0.3 }
+    }
+  },
+  "meta": { "analysisId": 101 }
+}
+```
+
+**Response 400**
+```json
+{
+  "error": "invalid_weights",
+  "message": "The sum of car and parts weights must be greater than zero."
+}
+```
+
+---
+
 ## Pilares do score — como são calculados
 
 ### Pilar 1 — Preço (price)
@@ -218,4 +386,5 @@ finalScore = priceScore × weight.price
 ## Fontes de dados
 - Preço de referência: heurística interna de depreciação (v0.1). Fase 2 integrará FIPE.
 - Consumo: informado pelo usuário. Fase 2 integrará base Inmetro/PBE.
-- Manutenção: informada pelo usuário ou estimativa por faixa. Fase 2 integrará catálogo de peças.
+- Manutenção: informada pelo usuário ou estimativa por faixa.
+- Pecas: catalogo local seed (`local_seed_v1`) com multiplicadores por marca, uso, idade, quilometragem e regiao.
