@@ -152,6 +152,56 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  void _rebalancePillar(String key, double value) {
+    final clamped = value.clamp(0.0, 1.0);
+    final current = <String, double>{
+      'price': _price,
+      'fuel': _fuel,
+      'maintenance': _maintenance,
+      'adequacy': _adequacy,
+    };
+
+    current[key] = clamped;
+    final others = current.keys.where((k) => k != key).toList();
+    final othersSum = others.fold<double>(0, (sum, k) => sum + (current[k] ?? 0));
+    final remaining = (1.0 - clamped).clamp(0.0, 1.0);
+
+    if (othersSum <= 0) {
+      final distributed = remaining / others.length;
+      for (final other in others) {
+        current[other] = distributed;
+      }
+    } else {
+      for (final other in others) {
+        final proportion = (current[other] ?? 0) / othersSum;
+        current[other] = remaining * proportion;
+      }
+    }
+
+    setState(() {
+      _price = current['price']!;
+      _fuel = current['fuel']!;
+      _maintenance = current['maintenance']!;
+      _adequacy = current['adequacy']!;
+    });
+  }
+
+  void _setCarWeight(double value) {
+    final clamped = value.clamp(0.0, 1.0);
+    setState(() {
+      _carWeight = clamped;
+      _partsWeight = 1.0 - clamped;
+    });
+  }
+
+  void _setPartsWeight(double value) {
+    final clamped = value.clamp(0.0, 1.0);
+    setState(() {
+      _partsWeight = clamped;
+      _carWeight = 1.0 - clamped;
+    });
+  }
+
   Widget _weightSlider({
     required String label,
     required double value,
@@ -199,31 +249,36 @@ class _SettingsPageState extends State<SettingsPage> {
                         const Text('Como o score funciona', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                         const SizedBox(height: 8),
                         const Text(
-                          'Cada slider aumenta ou reduz o impacto de um pilar na nota final. O backend normaliza automaticamente para somar 1.0.',
+                          'Cada slider define a prioridade do pilar na nota final. A soma e travada em 100% para o ajuste ficar previsivel.',
                         ),
                         const SizedBox(height: 16),
                         _weightSlider(
                           label: 'Preço',
                           value: _price,
-                          onChanged: (v) => setState(() => _price = v),
+                          onChanged: (v) => _rebalancePillar('price', v),
                         ),
                         _weightSlider(
                           label: 'Combustível',
                           value: _fuel,
-                          onChanged: (v) => setState(() => _fuel = v),
+                          onChanged: (v) => _rebalancePillar('fuel', v),
                         ),
                         _weightSlider(
                           label: 'Manutenção',
                           value: _maintenance,
-                          onChanged: (v) => setState(() => _maintenance = v),
+                          onChanged: (v) => _rebalancePillar('maintenance', v),
                         ),
                         _weightSlider(
                           label: 'Adequação',
                           value: _adequacy,
-                          onChanged: (v) => setState(() => _adequacy = v),
+                          onChanged: (v) => _rebalancePillar('adequacy', v),
                         ),
                         const SizedBox(height: 8),
-                        Text('Soma atual: ${sum.toStringAsFixed(2)}'),
+                        Text('Soma atual: ${(sum * 100).toStringAsFixed(0)}%'),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Preço ${(100 * _price).toStringAsFixed(0)}% • Combustível ${(100 * _fuel).toStringAsFixed(0)}% • Manutenção ${(100 * _maintenance).toStringAsFixed(0)}% • Adequação ${(100 * _adequacy).toStringAsFixed(0)}%',
+                          style: const TextStyle(fontSize: 12),
+                        ),
                         const SizedBox(height: 12),
                         const Divider(),
                         const SizedBox(height: 8),
@@ -235,14 +290,14 @@ class _SettingsPageState extends State<SettingsPage> {
                         _weightSlider(
                           label: 'Peso do score do carro',
                           value: _carWeight,
-                          onChanged: (v) => setState(() => _carWeight = v),
+                          onChanged: _setCarWeight,
                         ),
                         _weightSlider(
                           label: 'Peso do score de pecas',
                           value: _partsWeight,
-                          onChanged: (v) => setState(() => _partsWeight = v),
+                          onChanged: _setPartsWeight,
                         ),
-                        Text('Soma atual (carro+pecas): ${combinedSum.toStringAsFixed(2)}'),
+                        Text('Soma atual (carro+pecas): ${(combinedSum * 100).toStringAsFixed(0)}%'),
                         const SizedBox(height: 6),
                         const Text(
                           'Esses pesos sao enviados na analise combinada e mudam o termometro de compra.',

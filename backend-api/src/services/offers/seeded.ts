@@ -107,6 +107,26 @@ function containsNormalized(source: string, search?: string): boolean {
   return source.toLowerCase().includes(search.toLowerCase().trim());
 }
 
+function normalize(value?: string): string {
+  return (value ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+function isGenericRegion(region?: string): boolean {
+  const value = normalize(region);
+  return (
+    value.length === 0 ||
+    value === 'brasil' ||
+    value === 'br' ||
+    value === 'nacional' ||
+    value === 'todo brasil' ||
+    value === 'all'
+  );
+}
+
 export const seededOffersProvider: OffersProvider = {
   id: 'local',
   name: 'Base local',
@@ -118,12 +138,36 @@ export const seededOffersProvider: OffersProvider = {
   },
   async search(filters: OffersSearchFilters): Promise<MarketplaceOffer[]> {
     const offers = await getSeededOffers();
-    const region = filters.region.trim().toLowerCase();
+    const region = normalize(filters.region);
+
+    const matchesWithoutRegion = offers.filter((offer) => {
+      const matchesBrand = containsNormalized(offer.brand, filters.brand);
+      const matchesModel = containsNormalized(offer.model, filters.model);
+      return matchesBrand && matchesModel;
+    });
+
+    if (isGenericRegion(region)) {
+      return matchesWithoutRegion;
+    }
+
+    const regionMatches = matchesWithoutRegion.filter((offer) => {
+      return (
+        normalize(offer.region).includes(region) ||
+        normalize(offer.city).includes(region)
+      );
+    });
+
+    // If strict region matching returns too few local fallback options,
+    // keep user query useful by backfilling with nationwide brand/model matches.
+    if (regionMatches.length > 0 || (filters.brand || filters.model)) {
+      return regionMatches.length > 0 ? regionMatches : matchesWithoutRegion;
+    }
+
     return offers.filter((offer) => {
       const matchesRegion =
         region.length < 3 ||
-        offer.region.toLowerCase().includes(region) ||
-        offer.city.toLowerCase().includes(region);
+        normalize(offer.region).includes(region) ||
+        normalize(offer.city).includes(region);
       const matchesBrand = containsNormalized(offer.brand, filters.brand);
       const matchesModel = containsNormalized(offer.model, filters.model);
       return matchesRegion && matchesBrand && matchesModel;

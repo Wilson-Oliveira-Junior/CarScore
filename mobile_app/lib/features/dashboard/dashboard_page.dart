@@ -20,7 +20,7 @@ class _DashboardPageState extends State<DashboardPage>
   static const _recentFiltersKey = 'dashboard_recent_filters_v1';
 
   final _api = ApiClient();
-  final _regionCtrl = TextEditingController(text: 'Sao Paulo');
+  final _regionCtrl = TextEditingController(text: 'Brasil');
   final _brandCtrl = TextEditingController();
   final _modelCtrl = TextEditingController();
   final _maxPriceCtrl = TextEditingController();
@@ -225,8 +225,8 @@ class _DashboardPageState extends State<DashboardPage>
       _error = null;
     });
     try {
-      final region =
-          _regionCtrl.text.trim().isEmpty ? 'Sao Paulo' : _regionCtrl.text.trim();
+        final region =
+          _regionCtrl.text.trim().isEmpty ? 'Brasil' : _regionCtrl.text.trim();
       final offers = await _api.getOffers(
         region: region,
         limit: 12,

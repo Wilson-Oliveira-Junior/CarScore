@@ -19,6 +19,18 @@ function normalize(value?: string): string {
     .trim();
 }
 
+function isGenericRegion(region?: string): boolean {
+  const value = normalize(region);
+  return (
+    value.length === 0 ||
+    value === 'brasil' ||
+    value === 'br' ||
+    value === 'nacional' ||
+    value === 'todo brasil' ||
+    value === 'all'
+  );
+}
+
 function matchesFilters(offer: MarketplaceOffer, filters: OffersSearchFilters): boolean {
   const brand = normalize(filters.brand);
   const model = normalize(filters.model);
@@ -28,7 +40,7 @@ function matchesFilters(offer: MarketplaceOffer, filters: OffersSearchFilters): 
   const offerTitle = normalize(offer.title);
   const offerRegion = normalize(`${offer.city} ${offer.region}`);
 
-  if (region && !offerRegion.includes(region)) return false;
+  if (region && !isGenericRegion(region) && !offerRegion.includes(region)) return false;
   if (brand && !(offerBrand.includes(brand) || offerTitle.includes(brand))) return false;
   if (model && !(offerModel.includes(model) || offerTitle.includes(model))) return false;
   if (filters.minPrice != null && offer.price < filters.minPrice) return false;
