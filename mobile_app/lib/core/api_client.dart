@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -104,17 +105,50 @@ class ApiClient {
             );
 
   final String baseUrl;
+  static const Duration _requestTimeout = Duration(seconds: 12);
+
+  Future<http.Response> _get(Uri uri) async {
+    try {
+      return await http.get(uri).timeout(_requestTimeout);
+    } on TimeoutException {
+      throw Exception('Tempo limite excedido ao consultar $uri. Verifique API_BASE_URL e conexao de rede.');
+    }
+  }
+
+  Future<http.Response> _post(Uri uri, {Map<String, String>? headers, Object? body}) async {
+    try {
+      return await http.post(uri, headers: headers, body: body).timeout(_requestTimeout);
+    } on TimeoutException {
+      throw Exception('Tempo limite excedido ao consultar $uri. Verifique API_BASE_URL e conexao de rede.');
+    }
+  }
+
+  Future<http.Response> _put(Uri uri, {Map<String, String>? headers, Object? body}) async {
+    try {
+      return await http.put(uri, headers: headers, body: body).timeout(_requestTimeout);
+    } on TimeoutException {
+      throw Exception('Tempo limite excedido ao consultar $uri. Verifique API_BASE_URL e conexao de rede.');
+    }
+  }
+
+  Future<http.Response> _delete(Uri uri) async {
+    try {
+      return await http.delete(uri).timeout(_requestTimeout);
+    } on TimeoutException {
+      throw Exception('Tempo limite excedido ao consultar $uri. Verifique API_BASE_URL e conexao de rede.');
+    }
+  }
 
   Future<Map<String, dynamic>> health() async {
     final uri = Uri.parse('$baseUrl/health');
-    final resp = await http.get(uri);
+    final resp = await _get(uri);
     return _parse(resp);
   }
 
   Future<Map<String, dynamic>> estimate(Map<String, dynamic> body) async {
     final payload = Map<String, dynamic>.from(body);
     final uri = Uri.parse('$baseUrl/v1/analysis/estimate');
-    final resp = await http.post(uri,
+    final resp = await _post(uri,
         headers: {'Content-Type': 'application/json'}, body: jsonEncode(payload));
     return _parse(resp);
   }
@@ -136,7 +170,7 @@ class ApiClient {
     if (clientId != null && clientId.trim().isNotEmpty) {
       body['clientId'] = clientId.trim();
     }
-    final resp = await http.post(
+    final resp = await _post(
       uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(body),
@@ -146,7 +180,7 @@ class ApiClient {
 
   Future<Map<String, dynamic>> estimateParts(Map<String, dynamic> body) async {
     final uri = Uri.parse('$baseUrl/v1/parts/estimate');
-    final resp = await http.post(
+    final resp = await _post(
       uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(body),
@@ -160,7 +194,7 @@ class ApiClient {
       query['clientId'] = clientId.trim();
     }
     final uri = Uri.parse('$baseUrl/v1/analysis/history').replace(queryParameters: query);
-    final resp = await http.get(uri);
+    final resp = await _get(uri);
     final parsed = _parse(resp);
     final rawItems = (parsed['items'] as List<dynamic>? ?? []);
     return rawItems
@@ -176,13 +210,13 @@ class ApiClient {
     final uri = Uri.parse('$baseUrl/v1/analysis/history').replace(
       queryParameters: query.isEmpty ? null : query,
     );
-    final resp = await http.delete(uri);
+    final resp = await _delete(uri);
     return _parse(resp);
   }
 
   Future<ScoreWeights> getWeights() async {
     final uri = Uri.parse('$baseUrl/v1/config/weights');
-    final resp = await http.get(uri);
+    final resp = await _get(uri);
     final parsed = _parse(resp);
     final raw = Map<String, dynamic>.from(parsed['weights'] as Map);
     return {
@@ -195,7 +229,7 @@ class ApiClient {
 
   Future<ScoreWeights> updateWeights(ScoreWeights weights) async {
     final uri = Uri.parse('$baseUrl/v1/config/weights');
-    final resp = await http.put(
+    final resp = await _put(
       uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(weights),
@@ -214,7 +248,7 @@ class ApiClient {
 
   Future<List<FipeBrand>> getBrands() async {
     final uri = Uri.parse('$baseUrl/v1/vehicles/brands');
-    final resp = await http.get(uri);
+    final resp = await _get(uri);
     final parsed = _parse(resp);
     return (parsed['items'] as List<dynamic>)
         .map((e) => FipeBrand.fromJson(Map<String, dynamic>.from(e as Map)))
@@ -223,7 +257,7 @@ class ApiClient {
 
   Future<List<FipeModel>> getModels(String brandCode) async {
     final uri = Uri.parse('$baseUrl/v1/vehicles/models?brandCode=$brandCode');
-    final resp = await http.get(uri);
+    final resp = await _get(uri);
     final parsed = _parse(resp);
     return (parsed['items'] as List<dynamic>)
         .map((e) => FipeModel.fromJson(Map<String, dynamic>.from(e as Map)))
@@ -232,7 +266,7 @@ class ApiClient {
 
   Future<List<FipeYear>> getYears(String brandCode, int modelCode) async {
     final uri = Uri.parse('$baseUrl/v1/vehicles/years?brandCode=$brandCode&modelCode=$modelCode');
-    final resp = await http.get(uri);
+    final resp = await _get(uri);
     final parsed = _parse(resp);
     return (parsed['items'] as List<dynamic>)
         .map((e) => FipeYear.fromJson(Map<String, dynamic>.from(e as Map)))
@@ -242,14 +276,14 @@ class ApiClient {
   Future<FipePrice> getFipePrice(String brandCode, int modelCode, String yearCode) async {
     final uri = Uri.parse(
         '$baseUrl/v1/vehicles/fipe-price?brandCode=$brandCode&modelCode=$modelCode&yearCode=$yearCode');
-    final resp = await http.get(uri);
+    final resp = await _get(uri);
     return FipePrice.fromJson(_parse(resp));
   }
 
   Future<VehicleConsumption?> getConsumption(String brand, String model, int year) async {
     final uri = Uri.parse(
         '$baseUrl/v1/vehicles/consumption?brand=${Uri.encodeComponent(brand)}&model=${Uri.encodeComponent(model)}&year=$year');
-    final resp = await http.get(uri);
+    final resp = await _get(uri);
     if (resp.statusCode == 404) return null;
     return VehicleConsumption.fromJson(_parse(resp));
   }
@@ -390,7 +424,7 @@ extension ApiClientOffers on ApiClient {
       if (providers != null && providers.isNotEmpty) 'providers': providers.join(','),
     };
     final uri = Uri.parse('$baseUrl/v1/offers').replace(queryParameters: queryParameters);
-    final resp = await http.get(uri);
+    final resp = await _get(uri);
     final parsed = _parseOffers(resp);
     return (parsed['items'] as List<dynamic>)
         .map((e) => MarketplaceOffer.fromJson(Map<String, dynamic>.from(e as Map)))
@@ -399,7 +433,7 @@ extension ApiClientOffers on ApiClient {
 
   Future<List<OfferProviderHealth>> getOffersProvidersHealth() async {
     final uri = Uri.parse('$baseUrl/v1/offers/providers/health');
-    final resp = await http.get(uri);
+    final resp = await _get(uri);
     final parsed = _parseOffers(resp);
     return (parsed['providers'] as List<dynamic>)
         .map((e) => OfferProviderHealth.fromJson(
