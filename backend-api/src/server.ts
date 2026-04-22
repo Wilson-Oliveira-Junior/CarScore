@@ -2,33 +2,40 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
 import { analyze } from './score';
-import { clearAnalysisHistory, getAnalysisHistory, getWeights, initDb, insertAnalysis, updateWeights } from './db';
+import {
+  clearAnalysisHistory,
+  getAnalysisHistory,
+  getWeights,
+  initDb,
+  insertAnalysis,
+  updateWeights,
+} from './db';
 import { AnalysisInputSchema, WeightsUpdateSchema } from './contracts';
 import { vehicleRoutes } from './routes/vehicles';
 import { offersRoutes } from './routes/offers';
 import { partsRoutes } from './routes/parts';
 
-const app = Fastify({ logger: true });
+export const app = Fastify({ logger: true });
 
-async function buildServer() {
+export async function buildServer() {
   await initDb();
 
-  await app.register(cors, {
-    origin: true,
-  });
+  await app.register(cors, { origin: true });
 
   await app.register(vehicleRoutes);
   await app.register(offersRoutes);
   await app.register(partsRoutes);
 
-  app.get('/health', async () => {
-    return { status: 'ok', service: 'carscore-api' };
-  });
+  app.get('/health', async () => ({
+    status: 'ok',
+    service: 'carscore-api',
+  }));
 
   app.post('/v1/analysis/estimate', async (request, reply) => {
     const parsed = AnalysisInputSchema.extend({
       clientId: z.string().min(8).max(120).optional(),
     }).safeParse(request.body);
+
     if (!parsed.success) {
       return reply.status(400).send({
         error: 'invalid_payload',
@@ -48,9 +55,7 @@ async function buildServer() {
     return {
       input: data,
       result,
-      meta: {
-        analysisId,
-      },
+      meta: { analysisId },
     };
   });
 
@@ -65,18 +70,19 @@ async function buildServer() {
     const clientId = parsed.success ? parsed.data.clientId : undefined;
     const history = await getAnalysisHistory(limit, clientId);
 
-    return {
-      items: history,
-      count: history.length,
-    };
+    return { items: history, count: history.length };
   });
 
   app.delete('/v1/analysis/history', async (request) => {
     const querySchema = z.object({
       clientId: z.string().min(8).max(120).optional(),
     });
+
     const parsed = querySchema.safeParse(request.query);
-    const removed = await clearAnalysisHistory(parsed.success ? parsed.data.clientId : undefined);
+    const removed = await clearAnalysisHistory(
+      parsed.success ? parsed.data.clientId : undefined,
+    );
+
     return { ok: true, deleted: removed };
   });
 
@@ -110,13 +116,17 @@ async function buildServer() {
     const weights = await updateWeights(parsed.data);
     return { weights };
   });
+
+  return app;
 }
 
-buildServer()
-  .then(async () => {
-    await app.listen({ port: 3333, host: '0.0.0.0' });
-  })
-  .catch((error) => {
-    app.log.error(error);
-    process.exit(1);
-  });
+if (require.main === module) {
+  buildServer()
+    .then(async () => {
+      await app.listen({ port: 3333, host: '0.0.0.0' });
+    })
+    .catch((error) => {
+      app.log.error(error);
+      process.exit(1);
+    });
+}

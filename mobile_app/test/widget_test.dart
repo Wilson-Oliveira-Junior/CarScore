@@ -35,8 +35,23 @@ void main() {
 
     expect(find.text('Score: 68 / 100'), findsOneWidget);
     expect(find.text('Diagnostico rapido'), findsOneWidget);
-    expect(find.text('Termometro de qualidade da compra', skipOffstage: false), findsOneWidget);
-    expect(find.text('Resumo financeiro e referencia', skipOffstage: false), findsOneWidget);
-    expect(find.textContaining('Preco pedido', skipOffstage: false), findsOneWidget);
+
+    // Scroll down to make lazy-built ListView items visible before checking them.
+    await tester.dragUntilVisible(
+      find.text('Termometro de qualidade da compra'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Termometro de qualidade da compra'), findsOneWidget);
+
+    await tester.dragUntilVisible(
+      find.text('Resumo financeiro e referencia'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Resumo financeiro e referencia'), findsOneWidget);
+    expect(find.textContaining('Preco pedido'), findsOneWidget);
   });
 }

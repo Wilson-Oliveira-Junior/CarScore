@@ -327,6 +327,19 @@ class _AnalysisPageState extends State<AnalysisPage> {
                     ],
                   ),
                 ),
+              if (hasPrefill)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'Os dados do veículo foram pré-carregados a partir da seleção. Ajuste os campos se necessário e clique em Avaliar este veículo.',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                ),
               TextFormField(
                 controller: _vehicleCtrl,
                 decoration: const InputDecoration(
@@ -482,7 +495,7 @@ class _AnalysisPageState extends State<AnalysisPage> {
                         height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : Text(hasPrefill ? 'Gerar score detalhado' : 'Analisar agora'),
+                    : Text(hasPrefill ? 'Avaliar este veículo' : 'Analisar agora'),
               ),
             ],
           ),

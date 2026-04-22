@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/api_client.dart';
+import '../analysis/analysis_page.dart';
 import '../analysis/vehicle_search_page.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -887,13 +888,14 @@ class _DashboardPageState extends State<DashboardPage>
 
   Widget _buildMapHotspots() {
     final center = _mapCenterForRegion(_regionCtrl.text);
-    return Container(
-      height: 300,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        color: const Color(0xFFE8F0F5),
-      ),
-      child: Stack(
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          color: const Color(0xFFE8F0F5),
+        ),
+        child: Stack(
         clipBehavior: Clip.hardEdge,
         children: [
           Positioned.fill(
@@ -969,7 +971,7 @@ class _DashboardPageState extends State<DashboardPage>
                   Icon(Icons.map_outlined, color: Colors.white, size: 12),
                   SizedBox(width: 4),
                   Text(
-                    'Mapa real (OpenStreetMap)',
+                    'Mapa ilustrativo',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 11,
@@ -992,34 +994,62 @@ class _DashboardPageState extends State<DashboardPage>
           ),
 
           // Hotspots sobre o mapa
-          if (_loading)
-            Center(
-              child: Container(
-                margin: const EdgeInsets.only(top: 84),
-                width: 220,
-                height: 86,
-                child: Column(
-                  children: [
-                    _skeletonBox(height: 26, radius: 999),
-                    const SizedBox(height: 10),
-                    _skeletonBox(height: 16, width: 160, radius: 999),
-                  ],
-                ),
-              ),
-            )
-          else if (_offers.isEmpty)
-            const Center(
-              child: Text(
-                'Sem pinos para os filtros atuais',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black54,
-                ),
-              ),
-            ),
+          ..._buildDashboardOverlay(),
         ],
       ),
-    );
+    ),
+  );
+  }
+
+  void _analyzeOffer(MarketplaceOffer offer) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => AnalysisPage(
+        prefill: AnalysisPrefill(
+          vehicleLabel: '${offer.brand} ${offer.model}',
+          year: offer.year,
+          fipeReferencePrice: offer.fipeEstimate,
+          suggestedKmPerLiter: 12.0,
+          fuelType: 'Gasolina',
+        ),
+      ),
+    ));
+  }
+
+  List<Widget> _buildDashboardOverlay() {
+    if (_loading) {
+      return [
+        Center(
+          child: Container(
+            margin: const EdgeInsets.only(top: 84),
+            width: 220,
+            height: 86,
+            child: Column(
+              children: [
+                _skeletonBox(height: 26, radius: 999),
+                const SizedBox(height: 10),
+                _skeletonBox(height: 16, width: 160, radius: 999),
+              ],
+            ),
+          ),
+        ),
+      ];
+    }
+
+    if (_offers.isEmpty) {
+      return [
+        const Center(
+          child: Text(
+            'Sem pinos para os filtros atuais',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: Colors.black54,
+            ),
+          ),
+        ),
+      ];
+    }
+
+    return [];
   }
 
   Widget _buildSourceBadge(String label, String source) {
@@ -1235,11 +1265,9 @@ class _DashboardPageState extends State<DashboardPage>
                     const SizedBox(width: 8),
                     Expanded(
                       child: FilledButton.icon(
-                        onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                                builder: (_) => const VehicleSearchPage())),
+                        onPressed: () => _analyzeOffer(offer),
                         icon: const Icon(Icons.analytics_outlined, size: 16),
-                        label: const Text('Analisar'),
+                        label: const Text('Analisar esta oferta'),
                       ),
                     ),
                   ],

@@ -17,6 +17,17 @@ Funcionalidades que devem estar prontas para a primeira versao publica:
 - Historico de analises
 - Configuracao de pesos do score
 
+## Alteracoes recentes nesta iteracao
+
+- Dashboard agora permite analisar uma oferta diretamente e preenche a tela de analise com dados da oferta selecionada.
+- A tela de analise exibe um aviso claro quando os dados foram pre-carregados e permite ajuste antes do envio.
+- A pagina de resultado adiciona explicacao de como os dados de FIPE e de pecas foram usados no score final.
+- Botao de acao no fluxo de analise muda dinamicamente para "Avaliar este veículo" quando ha prefill.
+
+## Fora de escopo do primeiro release
+
+Itens que podem entrar apos o lancamento inicial:
+
 ## Fora de escopo do primeiro release
 
 Itens que podem entrar apos o lancamento inicial:

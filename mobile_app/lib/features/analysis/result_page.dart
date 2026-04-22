@@ -272,6 +272,12 @@ class ResultPage extends StatelessWidget {
 
     final pillars = carResult['pillars'] as Map<String, dynamic>? ?? {};
     final weights = carResult['weights'] as Map<String, dynamic>? ?? {};
+    final partsSource = partsResult?['source'] as String? ?? 'N/A';
+    final partsSourceLabel = partsSource == 'mercadolivre_blended_v1'
+        ? 'Mercado Livre + fallback local'
+        : partsSource == 'local_seed_v1'
+            ? 'Base local de peças'
+            : partsSource;
     final finalScore =
       (combinedResult != null ? combinedResult['score'] : carResult['finalScore']) ?? 0;
     final label =
@@ -425,6 +431,27 @@ class ResultPage extends StatelessWidget {
                             padding: const EdgeInsets.only(bottom: 4),
                             child: Text('↑ $item'),
                           )),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Como os dados foram usados',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 8),
+                    Text('Preço: referência FIPE ${referencePrice != null ? 'disponível' : 'não disponível'}.'),
+                    Text('Pecas: $partsSourceLabel.'),
+                    Text('Confiança de peças: ${confidence.label}.'),
+                    if (combinedResult != null)
+                      Text(
+                        'Peso combinado: ${(combinedResult['weights']?['car'] * 100).toInt()}% carro / ${(combinedResult['weights']?['parts'] * 100).toInt()}% peças.',
+                      ),
                   ],
                 ),
               ),
